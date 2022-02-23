@@ -29,7 +29,7 @@
     (when (not (empty? tributes))
       (let [chosen-one-name (rand-nth tributes)
             chosen-one (get candidates chosen-one-name)
-            player-move (if (zero? (players/jump chosen-one)) :right :left)]
+            player-move (if (zero? (players/jump chosen-one (:common-knowledge @state))) :right :left)]
             (swap! state dissoc :platform-players chosen-one-name)
             (swap! (get-in @state [:bridge 1 player-move]) assoc chosen-one-name chosen-one)))))
 
@@ -50,36 +50,36 @@
 ; TODO: clean this mess up.
 (defn maybe-move [state]
   (doseq [[num-step step] (reverse (:bridge @state))
-          :let [occupants (find-players step)]
-          :when (not (nil? occupants))
+          :let [location (find-players step)]
+          :when (not (nil? location))
           ;; This only works because max no. of players on a step is 1.
-          :let [player (val (first @occupants))]]
+          :let [[player-id player] (first @location)]]
     (when (can-jump num-step state)
       (let [player-move (players/move player (:common-knowledge @state))]
         (when (not (nil? player-move))
-          (let [player-dir (if (zero? player-move) :right :left)
-                player-id (:id player)]
-            (swap! occupants dissoc player-id)
+          (let [player-dir (if (zero? player-move) :right :left)]
+            (swap! location dissoc player-id)
             (swap! (get-in @state [:bridge (inc num-step) player-dir]) assoc player-id player)))))))
 
-(defn eliminate [state yellowbrick-rd]
+(defn eliminate [player location state]
+  (swap! location dissoc (:id player))
+  (swap! state assoc-in [:dead-players (:id player)] player))
+
+(defn end-of-tick [state yellowbrick-rd]
   (doseq [[num-step step] (:bridge @state)
-          :let [occupants (find-players step)]
-          :when (not (nil? occupants))
-          ;; This only works because max no. of players on a step is 1.
-          :let [player (val (first @occupants))]
-          :let [player-id (:id player)]
+          :let [location (find-players step)]
+          :when (not (nil? location))
+          ;; This only works because max no. of players on a location is 1.
+          :let [[_ player] (first @location)]
           :let [path (:path-travelled player)]]
     (when (not= (nth yellowbrick-rd (dec (count @path))) (last @path))
-      (swap! occupants dissoc player-id)
-      (swap! state assoc-in [:dead-players player-id] player))
-  )
-)
+      (eliminate player location state))))
+
 
 (defn -main []
   (spawn-players players-state 10)
   ; Do this part under dosync
   (maybe-jump players-state)
   (maybe-move players-state)
-  (eliminate players-state tempered-steps)
+  (end-of-tick players-state tempered-steps)
   (shutdown-agents))

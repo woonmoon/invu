@@ -16,9 +16,10 @@
         (:id player)))
 
 ; TODO: merge functions jump and move, they're the same thing.
-(defn jump [player]
+(defn jump [player common-knowledge]
     "A brave player will jump to the next step."
-    (let [decision (rand-int 2)]
+    (let [knowledge-available (not (empty? common-knowledge))
+          decision (if knowledge-available (first common-knowledge) (rand-int 2))]
         (swap! (:path-travelled player) conj decision)
         decision))
 
