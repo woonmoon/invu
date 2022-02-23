@@ -18,3 +18,17 @@
 (defn jump [player]
     "A brave player will jump to the next step."
     (swap! (:path-travelled player) conj (rand-int 2)))
+
+(defn move [player common-knowledge]
+    "A small step for one player, one giant leap for playerkind.
+    Players should follow common knowledge if available.
+    If will-to-live > 5, will move to a random direction.
+    Otherwise player will not move."
+    (let [path (:path-travelled player)
+          player-moves (count @path)]
+        (if (< player-moves (count common-knowledge))
+            (swap! path conj (nth common-knowledge player-moves))
+            (when (< (:will-to-live player) 5) 
+                (swap! path conj (rand-int 2))))
+    )
+)
