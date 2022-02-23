@@ -31,14 +31,12 @@
       (let [chosen-one-name (rand-nth tributes)
             chosen-one (get candidates chosen-one-name)]
             (println (count (get-in @state [:active-players :lower-platform])))
+            (println (count (get-in @state [:active-players :bridge])))
             (players/jump chosen-one)
             (swap! state util/dissoc-in [:active-players :lower-platform] chosen-one-name)
-            (println (count (get-in @state [:active-players :lower-platform]))))))
-    ;; (swap! (get-in @state [:active-players :lower-platform]) dissoc chosen-one-name)
-    ;; (swap! (get-in @state [:active-players :bridge] assoc chosen-one-name chosen-one))
-  ;; (println (remove nil? (into [] (map players/decide-jump (vals (get-in @state [:active-players :lower-platform]))))))
-  ;; (println (rand-nth (remove nil? (into [] (map players/decide-jump (vals (get-in @state [:active-players :lower-platform])))))))
-)
+            (swap! state assoc-in [:active-players :bridge chosen-one-name] chosen-one)
+            (println (count (get-in @state [:active-players :lower-platform])))
+            (println (count (get-in @state [:active-players :bridge])))))))
 
 (defn -main []
   (spawn-players app-state 10)
