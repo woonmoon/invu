@@ -15,20 +15,25 @@
         nil
         (:id player)))
 
+; TODO: merge functions jump and move, they're the same thing.
 (defn jump [player]
     "A brave player will jump to the next step."
-    (swap! (:path-travelled player) conj (rand-int 2)))
+    (let [decision (rand-int 2)]
+        (swap! (:path-travelled player) conj decision)
+        decision))
 
 (defn move [player common-knowledge]
     "A small step for one player, one giant leap for playerkind.
     Players should follow common knowledge if available.
     If will-to-live > 5, will move to a random direction.
-    Otherwise player will not move."
+    Returns true if player moved else false."
     (let [path (:path-travelled player)
-          player-moves (count @path)]
-        (if (< player-moves (count common-knowledge))
-            (swap! path conj (nth common-knowledge player-moves))
-            (when (< (:will-to-live player) 5) 
-                (swap! path conj (rand-int 2))))
-    )
-)
+          player-moves (count @path)
+          knowledge-available (< player-moves (count common-knowledge))
+          next-step (if knowledge-available (nth common-knowledge player-moves)
+                                            (rand-int 2))
+          will-jump (or knowledge-available (> (:will-to-live player) 2))]
+        (when will-jump
+            (swap! path conj next-step))            
+        ; TODO: There has got to be a better way of doing this. Consider "do"
+        (if will-jump next-step nil)))
