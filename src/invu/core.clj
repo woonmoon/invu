@@ -10,8 +10,8 @@
 (defonce players-state
   (atom { :platform-players {}
           :bridge (into (sorted-map) (domain/init-bridge 6))
-          :inactive-players {:dead {} 
-                              :survived {}}
+          :dead-players {}
+          :survivors {}
           :common-knowledge []}))
 
 (defn spawn-players [state num-players]
@@ -34,6 +34,7 @@
             (swap! (get-in @state [:bridge 1 player-move]) assoc chosen-one-name chosen-one)))))
 
 (defn can-jump [position state]
+  "Check if the next step of the bridge is occupied or not."
   (let [next-step (get-in @state [:bridge (inc position)])]
     (if (and (empty? @(:left next-step)) (empty? @(:right next-step)))
       true
@@ -59,19 +60,26 @@
           (let [player-dir (if (zero? player-move) :right :left)
                 player-id (:id player)]
             (swap! occupants dissoc player-id)
-            (swap! (get-in @state [:bridge (inc num-step) player-dir]) assoc player-id player)
-          )
-        )
-      )
-    )
+            (swap! (get-in @state [:bridge (inc num-step) player-dir]) assoc player-id player)))))))
+
+(defn eliminate [state yellowbrick-rd]
+  (doseq [[num-step step] (:bridge @state)
+          :let [occupants (find-players step)]
+          :when (not (nil? occupants))
+          ;; This only works because max no. of players on a step is 1.
+          :let [player (val (first @occupants))]
+          :let [player-id (:id player)]
+          :let [path (:path-travelled player)]]
+    (when (not= (nth yellowbrick-rd (dec (count @path))) (last @path))
+      (swap! occupants dissoc player-id)
+      (swap! state assoc-in [:dead-players player-id] player))
   )
 )
-
-;; (defn eliminate [state])
 
 (defn -main []
   (spawn-players players-state 10)
   ; Do this part under dosync
   (maybe-jump players-state)
   (maybe-move players-state)
+  (eliminate players-state tempered-steps)
   (shutdown-agents))
