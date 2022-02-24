@@ -1,7 +1,14 @@
-(ns invu.util)
+(ns invu.util
+    (:require [clojure.set :as set]))
 
 (defn dissoc-in [nested-map nested-keys rm-key]
     (update-in nested-map nested-keys dissoc rm-key))
+
+(defn state-union [map field item]
+    (update map field set/union item))
+
+(defn state-disj [map field item]
+    (update map field disj item))
 
 (defn rand-range [lower-bound upper-bound]
     "Generates number between lower-bound (inclusive) and upper bound (exclusive)"

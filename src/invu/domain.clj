@@ -10,4 +10,4 @@
   (zipmap 
     (range 1 (inc num-steps)) 
     (take num-steps 
-      (repeatedly #(map->Step {:left (atom {}) :right (atom {})})))))
+      (repeatedly #(map->Step {:left (atom #{}) :right (atom #{})})))))
