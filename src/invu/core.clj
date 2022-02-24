@@ -79,6 +79,18 @@
     (swap! state util/state-disj :bridge-players #{id})
     (swap! state util/state-union :dead-players #{id})))
 
+(defn update-common-knowledge [state player-lookup]
+  (println (map #(get @player-lookup %) (:bridge-players @state)))
+  (println (first (sort-by count (map #(deref (:path-travelled %)) (map #(get @player-lookup %) (:bridge-players @state))))))
+  (let [players (map #(get @player-lookup %) (:bridge-players @state))
+        longest-path (first (sort-by count (map #(deref (:path-travelled %)) players)))]
+      (when (< (count (:common-knowledge @state)) (count longest-path))
+        (println longest-path)
+        (swap! state util/state-replace :common-knowledge longest-path)
+      )
+    )
+  )
+
 ;; (defn end-of-tick [state yellowbrick-rd]
 ;;   (doseq [[num-step step] (:bridge @state)
 ;;           :let [location (find-players step)]
@@ -96,5 +108,6 @@
   (maybe-jump players-state bridge id-to-player)
   (maybe-move bridge id-to-player (:common-knowledge @players-state))
   (eliminate players-state bridge id-to-player tempered-steps)
+  (update-common-knowledge players-state id-to-player)
   ; (end-of-tick players-state tempered-steps)
   (shutdown-agents))

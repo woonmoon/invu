@@ -10,6 +10,8 @@
 (defn state-disj [map field item]
     (update map field disj item))
 
+(defn state-replace [map field item]
+    (update map field (fn [_] item)))
 (defn rand-range [lower-bound upper-bound]
     "Generates number between lower-bound (inclusive) and upper bound (exclusive)"
     (+ lower-bound (rand-int (- upper-bound lower-bound))))
