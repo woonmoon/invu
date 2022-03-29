@@ -72,13 +72,14 @@
 
 ; TODO: You can definitely write this without doseq.
 (defn eliminate [state player-lookup yellowbrick-rd]
-  (doseq [player (map #(get @player-lookup %) (:bridge state))
+  (doseq [player (map #(get @player-lookup %) (:bridge-players @state))
           :let [id (:id player)]
           :let [path @(:path-travelled player)]
           :let [last-move (if (zero? (last path)) :right :left)]
-          :when (not= (nth yellowbrick-rd (dec (count path))) (last path))]
+          :when (not= (nth yellowbrick-rd (dec (count path))) (last path))
+          ]
     (swap! (get-in @state [:bridge (count path) last-move]) disj id)
-    (swap! state util/state-disj :bridge-players #{id})
+    (swap! state util/state-disj :bridge-players id)
     (swap! state util/state-union :dead-players #{id})))
 
 (defn join-states [jumped-state moved-state]
@@ -100,11 +101,12 @@
 (defn -main []
   (spawn-players players-state id-to-player 10)
   ; Do this part under dosync
-  (println @players-state)
   (let [jumped-state 
           (future (swap! players-state maybe-jump id-to-player))]
     (swap! players-state maybe-move id-to-player (:common-knowledge @players-state))
     (swap! players-state join-states @jumped-state))
+  (println @players-state)
+  (eliminate players-state id-to-player tempered-steps)
   (println @players-state)
   ; (update-common-knowledge players-state id-to-player)
   ; (end-of-tick players-state tempered-steps)
