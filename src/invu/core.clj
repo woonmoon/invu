@@ -56,14 +56,14 @@
 
 ; TODO: Clean this up. For now you're kind of stuck in this mess because
 ;       you specifically want to traverse front of bridge to back.
-(defn maybe-move [state player-lookup common-knowledge]
+(defn maybe-move [state player-lookup]
   (doseq [[num-step step] (reverse (state :bridge))
           :let [location (find-players step)]
           :when (not (nil? location))
           ;; This only works because max no. of players on a step is 1.
           :let [player-id (first @location)]]
     (when (can-jump num-step state)
-      (let [player-move (players/move (get @player-lookup player-id) common-knowledge)]
+      (let [player-move (players/move (get @player-lookup player-id) (:common-knowledge state))]
         (when (not (nil? player-move))
           (let [player-dir (if (zero? player-move) :right :left)]
             (swap! location disj player-id)
@@ -82,6 +82,7 @@
     (swap! state util/state-disj :bridge-players id)
     (swap! state util/state-union :dead-players #{id})))
 
+; DO SOMETHING ABOUT THE DEAD AGENTS
 (defn join-states [jumped-state moved-state]
   (let [new-bridge (assoc (:bridge moved-state) 1 (get-in jumped-state [:bridge 1]))]
     {
@@ -98,14 +99,20 @@
       (when (< (count (:common-knowledge @state)) (count longest-path))
         (swap! state util/state-replace :common-knowledge longest-path))))
 
+(defn tick [state player-lookup tempered-steps]
+  (let [jumped-state (future (swap! state maybe-jump player-lookup))]
+    (swap! state maybe-move player-lookup)
+    (swap! state join-states @jumped-state))
+  (eliminate state player-lookup tempered-steps)
+  (update-common-knowledge state player-lookup)
+  (println @state))
+
 (defn -main []
   (spawn-players players-state id-to-player 10)
-  ; Do this part under dosync
-  (let [jumped-state 
-          (future (swap! players-state maybe-jump id-to-player))]
-    (swap! players-state maybe-move id-to-player (:common-knowledge @players-state))
-    (swap! players-state join-states @jumped-state))
-  (eliminate players-state id-to-player tempered-steps)
-  (update-common-knowledge players-state id-to-player)
+  (println "INITIAL STATE")
+  (println @players-state)
+  (println "*************")
+  (dotimes [_ 5] 
+    (tick players-state id-to-player tempered-steps))
   ; (end-of-tick players-state tempered-steps)
   (shutdown-agents))
