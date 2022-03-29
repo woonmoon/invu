@@ -38,3 +38,5 @@
             (swap! path conj next-step))            
         ; TODO: There has got to be a better way of doing this. Consider "do"
         (if will-jump next-step nil)))
+
+    ;; TODO WRAP BRIDGE IN ATOM
