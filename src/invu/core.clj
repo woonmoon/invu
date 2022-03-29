@@ -105,9 +105,7 @@
           (future (swap! players-state maybe-jump id-to-player))]
     (swap! players-state maybe-move id-to-player (:common-knowledge @players-state))
     (swap! players-state join-states @jumped-state))
-  (println @players-state)
   (eliminate players-state id-to-player tempered-steps)
-  (println @players-state)
-  ; (update-common-knowledge players-state id-to-player)
+  (update-common-knowledge players-state id-to-player)
   ; (end-of-tick players-state tempered-steps)
   (shutdown-agents))
