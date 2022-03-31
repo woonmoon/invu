@@ -7,45 +7,40 @@
 
 (defonce tempered-steps [0 1 0 1 0 0])
 
-(defonce players-state
-  (atom { :platform-players #{}
-          :bridge-players #{}
-          :dead-players #{}
-          :survivors #{}
-          :common-knowledge []
-          :bridge (into (sorted-map) (domain/init-bridge 6))}))
+(defonce new-state
+  (atom { :active-players {}
+          :dead-players {}
+          :survivors {}
+          :common-knowledge []}))
 
-(defonce id-to-player (atom {}))
+(defn init-state [state num-steps]
+  (let [num-entries (inc num-steps)
+        bridge (zipmap 
+                  (map #(keyword (str %)) (range num-entries)) 
+                  (take num-entries (repeat #{})))]
+    (swap! state assoc :active-players bridge)))
 
-(defn spawn-players [state player-lookup num-players]
+(defn spawn-players [state num-players]
   (let [ids (take num-players (repeatedly #(gensym "Player")))
-        players (into [] (map (partial players/init-player) ids))
-        ids-to-players (zipmap ids players)]
-    ;; NOTE: maybe a bit dodge? idk if it's guaranteed that names and players are 
-    ;;       correctly ordered at this point.
-    (swap! state util/state-union :platform-players (into #{} ids))
-    (swap! player-lookup merge ids-to-players)))
+        players (into #{} (map (partial players/init-player) ids))]
+    (swap! state assoc-in [:active-players :0] players)))
 
-; This can def be done better without abusing let-bindings. Read about post-walk
-(defn maybe-jump [state player-lookup]
+(defn maybe-jump [state]
   "I volunteer as tribute!"
-  (let [candidates (vec (:platform-players state))
-        tributes (remove nil? (into [] (map players/decide-jump (map #(get @player-lookup %) candidates))))]
-    (when (not (empty? tributes))
-      (let [chosen-one-name (rand-nth tributes)
-            chosen-one (get @player-lookup chosen-one-name)
-            player-move (if (zero? (players/jump chosen-one (:common-knowledge state))) :right :left)
-            disjoint-state (util/state-disj state :platform-players chosen-one-name)
-            unioned-state (util/state-union disjoint-state :bridge-players #{chosen-one-name})]
-              (swap! (get-in unioned-state [:bridge 1 player-move]) conj chosen-one-name)
-              unioned-state))))
+  (let [candidates (get-in state [:active-players :0])
+        tributes (remove nil? 
+                    (map #(players/decide-jump % (:common-knowledge state)) candidates))]
+    (if (empty? tributes)
+      state
+      (let [chosen-one (rand-nth tributes)
+            player-move (players/jump chosen-one (:common-knowledge state))
+            disjoint-state (update-in state [:active-players :0] disj chosen-one)]
+            (swap! (:location chosen-one) inc)
+            (assoc-in disjoint-state [:active-players :1] #{chosen-one})))))
 
-(defn can-jump [position state]
+(defn can-jump [location state]
   "Check if the next step of the bridge is occupied or not."
-  (let [next-step (get-in state [:bridge (inc position)])]
-    (if (and (empty? @(:left next-step)) (empty? @(:right next-step)))
-      true 
-      false)))
+  (empty? (get-in state [:active-players (inc location)])))
 
 (defn find-players [step]
   "If the step is occupied return the map of occupants, if none return nil"
@@ -54,21 +49,31 @@
     (not (empty? @(:right step))) (:right step)
     :default nil))
 
-; TODO: Clean this up. For now you're kind of stuck in this mess because
-;       you specifically want to traverse front of bridge to back.
-(defn maybe-move [state player-lookup]
-  (doseq [[num-step step] (reverse (state :bridge))
-          :let [location (find-players step)]
-          :when (not (nil? location))
-          ;; This only works because max no. of players on a step is 1.
-          :let [player-id (first @location)]]
-    (when (can-jump num-step state)
-      (let [player-move (players/move (get @player-lookup player-id) (:common-knowledge state))]
-        (when (not (nil? player-move))
-          (let [player-dir (if (zero? player-move) :right :left)]
-            (swap! location disj player-id)
-            (swap! (get-in state [:bridge (inc num-step) player-dir]) conj player-id))))))
-    state)
+(defn maybe-move [state]
+  (let [platform (get-in state [:active-players :0])
+        bridge (atom (dissoc (:active-players state) :0))
+        common-knowledge (:common-knowledge state)]
+    ;; (println "INIT BRIDGE")
+    ;; (println @bridge)
+    (doseq [[step players] @bridge
+            :when (not (empty? players))
+            :let [player (first players)]
+            :let [location @(:location player)]
+            :when (can-jump location state)
+            :let [player-move (players/move player common-knowledge)]
+            :when (not (nil? player-move))]
+      ;; (println "SOMEBODY CHOSE TO MOVE")
+      ;; (println @bridge)
+      (swap! bridge #(update-in % [step] disj player))
+      ;; (println "NEW INDEX")
+      ;; (println (keyword (str (inc location))))
+      (swap! bridge #(update-in % [(keyword (str (inc location)))] conj player)))
+    ;; (println "PLATFORM")
+    ;; (println platform)
+    ;; (println "BRIDGE")
+    ;; (println @bridge)
+    ;; (println "*******")
+    (assoc state :active-players (merge {:0 platform} @bridge))))
 
 ; TODO: You can definitely write this without doseq.
 (defn eliminate [state player-lookup yellowbrick-rd]
@@ -76,11 +81,12 @@
           :let [id (:id player)]
           :let [path @(:path-travelled player)]
           :let [last-move (if (zero? (last path)) :right :left)]
-          :when (not= (nth yellowbrick-rd (dec (count path))) (last path))
-          ]
+          :let [correct-step (nth yellowbrick-rd (dec (count path)))]
+          :when (not= correct-step (last path))]
     (swap! (get-in @state [:bridge (count path) last-move]) disj id)
     (swap! state util/state-disj :bridge-players id)
-    (swap! state util/state-union :dead-players #{id})))
+    (swap! state util/state-union :dead-players #{id})
+    correct-step))
 
 ; DO SOMETHING ABOUT THE DEAD AGENTS
 (defn join-states [jumped-state moved-state]
@@ -88,6 +94,8 @@
     {
       :platform-players (:platform-players jumped-state)
       :bridge-players (:bridge-players jumped-state)
+      :dead-players (:dead-players jumped-state)
+      :survivors (:survivors jumped-state)
       :common-knowledge (:common-knowledge moved-state)
       :bridge new-bridge
     }
@@ -100,19 +108,31 @@
         (swap! state util/state-replace :common-knowledge longest-path))))
 
 (defn tick [state player-lookup tempered-steps]
-  (let [jumped-state (future (swap! state maybe-jump player-lookup))]
-    (swap! state maybe-move player-lookup)
+  (let [jumped-state (future (swap! new-state maybe-jump))]
+    (swap! new-state maybe-move)
     (swap! state join-states @jumped-state))
   (eliminate state player-lookup tempered-steps)
   (update-common-knowledge state player-lookup)
   (println @state))
 
 (defn -main []
-  (spawn-players players-state id-to-player 10)
-  (println "INITIAL STATE")
-  (println @players-state)
-  (println "*************")
-  (dotimes [_ 5] 
-    (tick players-state id-to-player tempered-steps))
-  ; (end-of-tick players-state tempered-steps)
-  (shutdown-agents))
+  ;; (spawn-players players-state id-to-player 10)
+  ;; (println "INITIAL STATE")
+  ;; (println @players-state)
+  ;; (println "*************")
+  ;; (dotimes [_ 5] 
+  ;;   (tick players-state id-to-player tempered-steps))
+  ;; ; (end-of-tick players-state tempered-steps)
+  ;; (shutdown-agents)
+
+  (println @new-state)
+  (println "********")
+  (init-state new-state 6)
+  (spawn-players new-state 5)
+  (swap! new-state maybe-jump)
+  (println @new-state)
+  (println "********")
+  (swap! new-state maybe-move)
+  (println @new-state)
+  (shutdown-agents)
+)
