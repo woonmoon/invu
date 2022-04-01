@@ -20,7 +20,9 @@
     "A brave player will jump to the next step."
     (if (not (empty? common-knowledge)) 
         (first common-knowledge) 
-        (rand-int 2)))
+        (let [choice (rand-int 2)]
+            (reset! (:decision player) choice)
+            choice)))
 
 (defn move [player common-knowledge]
     "A small step for one player, one giant leap for playerkind.
@@ -32,8 +34,10 @@
           will-jump (or knowledge-available (> (:will-to-live player) 2))
           next-step (if knowledge-available (nth common-knowledge location)
                                             (rand-int 2))]
+        (println player)
         (when will-jump
-            (swap! (:decision player) (fn [_] next-step)))            
+            (reset! (:decision player) next-step))
+        (println player)            
         (if will-jump next-step nil)))
 
     ;; TODO WRAP BRIDGE IN ATOM

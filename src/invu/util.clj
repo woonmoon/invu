@@ -1,6 +1,9 @@
 (ns invu.util
     (:require [clojure.set :as set]))
 
+(defn other-direction [direction]
+    (if (zero? @direction) 1 0))
+
 (defn dissoc-in [nested-map nested-keys rm-key]
     (update-in nested-map nested-keys dissoc rm-key))
 
