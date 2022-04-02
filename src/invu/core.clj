@@ -53,6 +53,7 @@
   (let [platform (get-in state [:active-players :0])
         bridge (atom (dissoc (:active-players state) :0))
         common-knowledge (:common-knowledge state)]
+    (println "MAYBE MOVING")
     (doseq [[step players] @bridge
             :when (not (empty? players))
             :let [player (first players)]
@@ -60,6 +61,7 @@
             :when (can-jump location state)
             :let [player-move (players/move player common-knowledge)]
             :when (not (nil? player-move))]
+      (println "found players to move")
       (swap! bridge #(update-in % [step] disj player))
       (swap! bridge #(update-in % [(keyword (str (inc location)))] conj player)))
     (assoc state :active-players (merge {:0 platform} @bridge))))
@@ -71,23 +73,26 @@
 
 (defn kill [state step player]
   (swap! state #(update-in % [:active-players step] disj player))
-  (swap! state #(update-in % [:dead-players] conj player))
-  (util/other-direction (:decision player)))
+  (swap! state #(update-in % [:dead-players] conj player)))
 
-; TODO: You can definitely write this without doseq.
-(defn eliminate [state tempered-steps]
+; Nobody stepped forward
+; Somebody stepped forward and died
+; Somebody stepped forward and survived
+(defn find-correct-step [state tempered-steps]
   (let [leading-step (find-leading-step 5 (:active-players @state))
-        leading-player (first (get-in @state [:active-players leading-step]))]
-    (if (or (= :0 leading-step) (= (leading-step tempered-steps) @(:decision leading-player)))
-        nil
-        (kill state leading-step leading-player))))
+        leading-player (first (get-in @state [:active-players leading-step]))
+        correct-step (leading-step tempered-steps)]
+    (if (= :0 leading-step)
+      nil
+      (if (= correct-step @(:decision leading-player))
+        correct-step
+        (do
+          (kill state leading-step leading-player)
+          (util/other-direction (:decision leading-player)))))))
 
-;; (defn end-of-tick [state tempered-steps]
-;;   (let [new-wisdom (eliminate state tempered-steps)]
-    
-;;     (swap! state #(update % :common-knowledge new-wisdom))
-;;     )
-;;   )
+(defn end-of-tick [state tempered-steps]
+  (when-let [knowledge (find-correct-step state tempered-steps)]
+    (swap! state #(update % :common-knowledge conj knowledge))))
 
 (defn join-states [jumped-state moved-state]
   (let [platform (get-in jumped-state [:active-players :0])
@@ -102,24 +107,15 @@
 (defn tick [state tempered-steps]
   (let [jumped-state (future (swap! state maybe-jump))]
     (swap! state maybe-move)
-    (swap! state join-states @jumped-state)))
+    (swap! state join-states @jumped-state))
+  (end-of-tick state tempered-steps))
 
 (defn -main []
-  ;; (spawn-players players-state id-to-player 10)
-  ;; (println "INITIAL STATE")
-  ;; (println @players-state)
-  ;; (println "*************")
-  ;; (dotimes [_ 5] 
-  ;;   (tick players-state id-to-player tempered-steps))
-  ;; ; (end-of-tick players-state tempered-steps)
-  ;; (shutdown-agents)
-
-  (println @new-state)
-  (println "********")
   (init-state new-state 6)
   (spawn-players new-state 5)
-  (tick new-state tempered-steps)
-  (eliminate new-state tempered-steps)
-  (println @new-state)
+  (dotimes [_ 6]
+    (tick new-state tempered-steps)
+    (println "********")
+    (println @new-state))
   (shutdown-agents)
 )
