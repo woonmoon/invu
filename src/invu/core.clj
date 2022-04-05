@@ -11,7 +11,7 @@
   (atom { :active-players {}
           :dead-players #{}
           :survivors #{}
-          :common-knowledge []}))
+          :common-knowledge {}}))
 
 (defn init-state [state num-steps]
   (let [num-entries (inc num-steps)
@@ -53,7 +53,6 @@
   (let [platform (get-in state [:active-players :0])
         bridge (atom (dissoc (:active-players state) :0))
         common-knowledge (:common-knowledge state)]
-    (println "MAYBE MOVING")
     (doseq [[step players] @bridge
             :when (not (empty? players))
             :let [player (first players)]
@@ -61,12 +60,15 @@
             :when (can-jump location state)
             :let [player-move (players/move player common-knowledge)]
             :when (not (nil? player-move))]
-      (println "found players to move")
-      (swap! bridge #(update-in % [step] disj player))
-      (swap! bridge #(update-in % [(keyword (str (inc location)))] conj player)))
+      (println "Moving player: " (:id player))
+      (swap! bridge #(update % step disj player))
+      (swap! bridge #(update % (keyword (str (inc location))) conj player)))
+    (println "***ASSOC STATE***")
+    (println (assoc state :active-players (merge {:0 platform} @bridge)))
     (assoc state :active-players (merge {:0 platform} @bridge))))
 
-(defn find-leading-step [num-players active-players]
+(defn find-leading-step [active-players]
+  (println "ACTIVE PLAYERS: " active-players)
   (first 
     (first 
       (filter #(not (empty? (second %))) (reverse active-players)))))
@@ -79,43 +81,78 @@
 ; Somebody stepped forward and died
 ; Somebody stepped forward and survived
 (defn find-correct-step [state tempered-steps]
-  (let [leading-step (find-leading-step 5 (:active-players @state))
+  (let [leading-step (find-leading-step (get @state :active-players))
         leading-player (first (get-in @state [:active-players leading-step]))
-        correct-step (leading-step tempered-steps)]
-    (if (= :0 leading-step)
+        correct-step (get tempered-steps leading-step)
+        common-knowledge (:common-knowledge @state)]
+    (println "LEADING STEP: " leading-step)
+    (println "LEADING PLAYER: " leading-player)
+    (println "CORRECT STEP: " correct-step)
+    (println "LEADING DECISION: " @(:decision leading-player))
+    (if (or (= :0 leading-step) (contains? common-knowledge leading-step))
       nil
       (if (= correct-step @(:decision leading-player))
-        correct-step
+        [leading-step correct-step]
         (do
           (kill state leading-step leading-player)
-          (util/other-direction (:decision leading-player)))))))
+          [leading-step (util/other-direction @(:decision leading-player))])))))
 
 (defn end-of-tick [state tempered-steps]
-  (when-let [knowledge (find-correct-step state tempered-steps)]
-    (swap! state #(update % :common-knowledge conj knowledge))))
+  (when-let [[step knowledge] (find-correct-step state tempered-steps)]
+    (swap! state #(assoc-in % [:common-knowledge step] knowledge))))
 
-(defn join-states [jumped-state moved-state]
+  ; FIX THIS SHIT
+(defn join-states [moved-state jumped-state]
   (let [platform (get-in jumped-state [:active-players :0])
-        bridge (dissoc (:active-players moved-state) :0)]
+        first-step (get-in jumped-state [:active-players :1])
+        bridge (dissoc (get moved-state :active-players) :0 :1)]
+    (println "***MOVED STATE***")
+    (println moved-state)
+    (println "***JUMPED STATE***")
+    (println jumped-state)
+    (println "***PLATFORM***")
+    (println {:0 platform})
+    (println "***FIRST STEP***")
+    (println {:1 first-step})
+    (println "***BRIDGE***")
+    (println bridge)
+    (println "***MERGED***")
+    (println (merge {:0 platform} {:1 first-step} bridge))
     {
-      :active-players (merge {:0 platform} bridge)
+      :active-players (merge {:0 platform} {:1 first-step} bridge)
       :dead-players (:dead-players jumped-state)
       :survivors (:survivors jumped-state)
       :common-knowledge (:common-knowledge moved-state)
     }))
 
+;jumped-state and state
 (defn tick [state tempered-steps]
-  (let [jumped-state (future (swap! state maybe-jump))]
+  (let [jumped-state (future (maybe-jump @state))]
     (swap! state maybe-move)
-    (swap! state join-states @jumped-state))
+    (swap! state join-states @jumped-state)
+  )
   (end-of-tick state tempered-steps))
 
 (defn -main []
   (init-state new-state 6)
   (spawn-players new-state 5)
-  (dotimes [_ 6]
-    (tick new-state tempered-steps)
-    (println "********")
-    (println @new-state))
+  (println "********INITIAL STATE********")
+  (println @new-state)
+  (newline)
+  (println "********START TICK 1********")
+  (tick new-state tempered-steps)
+  (println "********FINAL TICK 1  STATE********")
+  (println @new-state)
+  (newline)
+  (println "********START TICK 2********")
+  (tick new-state tempered-steps)
+  (println "********FINAL TICK 2 STATE********")
+  (println @new-state)
+  (newline)
+  (println "********START TICK 3********")
+  (tick new-state tempered-steps)
+  (println "********FINAL TICK 3 STATE********")
+  (println @new-state)
+  (newline)
   (shutdown-agents)
 )

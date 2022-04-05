@@ -10,10 +10,10 @@
     "Given a player on the lower platform decides if she wants to jump ship."
     ; Currently a random decision weighted on will-to-live.
     ; Clojure is dynamically typed so this black magic is legal
-    (if (or (< (* (rand-int 2) (:will-to-live player)) 5) 
+    (if (or (> (* (rand-int 2) (:will-to-live player)) 0) 
             (not (empty? common-knowledge)))
-        nil
-        player))
+        player
+        nil))
 
 ; TODO: merge functions jump and move, they're the same thing.
 (defn jump [player common-knowledge]
@@ -30,14 +30,14 @@
     If will-to-live > 5, will move to a random direction.
     Returns true if player moved else false."
     (let [location @(:location player)
-          knowledge-available (< location (count common-knowledge))
-          will-jump (or knowledge-available (> (:will-to-live player) 2))
-          next-step (if knowledge-available (nth common-knowledge location)
+          knowledge-available (contains? common-knowledge location)
+          will-jump (or knowledge-available (> (:will-to-live player) 0))
+          next-step (if knowledge-available [(keyword (str location)) common-knowledge]
                                             (rand-int 2))]
-        (println player)
-        (when will-jump
-            (reset! (:decision player) next-step))
-        (println player)            
-        (if will-jump next-step nil)))
+        (if will-jump 
+            (do
+                (reset! (:decision player) next-step)
+                next-step) 
+            nil)))
 
     ;; TODO WRAP BRIDGE IN ATOM
