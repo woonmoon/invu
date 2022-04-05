@@ -40,7 +40,7 @@
 
 (defn can-jump [location state]
   "Check if the next step of the bridge is occupied or not."
-  (empty? (get-in state [:active-players (inc location)])))
+  (empty? (get-in state [:active-players (keyword (str (inc location)))])))
 
 (defn find-players [step]
   "If the step is occupied return the map of occupants, if none return nil"
@@ -63,19 +63,19 @@
       (println "Moving player: " (:id player))
       (swap! bridge #(update % step disj player))
       (swap! bridge #(update % (keyword (str (inc location))) conj player)))
-    (println "***ASSOC STATE***")
-    (println (assoc state :active-players (merge {:0 platform} @bridge)))
+    ;; (println "***ASSOC STATE***")
+    ;; (println (assoc state :active-players (merge {:0 platform} @bridge)))
     (assoc state :active-players (merge {:0 platform} @bridge))))
 
 (defn find-leading-step [active-players]
-  (println "ACTIVE PLAYERS: " active-players)
   (first 
     (first 
       (filter #(not (empty? (second %))) (reverse active-players)))))
 
 (defn kill [state step player]
   (swap! state #(update-in % [:active-players step] disj player))
-  (swap! state #(update-in % [:dead-players] conj player)))
+  (swap! state #(update-in % [:dead-players] conj player))
+)
 
 ; Nobody stepped forward
 ; Somebody stepped forward and died
@@ -85,10 +85,10 @@
         leading-player (first (get-in @state [:active-players leading-step]))
         correct-step (get tempered-steps leading-step)
         common-knowledge (:common-knowledge @state)]
-    (println "LEADING STEP: " leading-step)
-    (println "LEADING PLAYER: " leading-player)
-    (println "CORRECT STEP: " correct-step)
-    (println "LEADING DECISION: " @(:decision leading-player))
+    ;; (println "LEADING STEP: " leading-step)
+    ;; (println "LEADING PLAYER: " leading-player)
+    ;; (println "CORRECT STEP: " correct-step)
+    ;; (println "LEADING DECISION: " @(:decision leading-player))
     (if (or (= :0 leading-step) (contains? common-knowledge leading-step))
       nil
       (if (= correct-step @(:decision leading-player))
@@ -99,38 +99,13 @@
 
 (defn end-of-tick [state tempered-steps]
   (when-let [[step knowledge] (find-correct-step state tempered-steps)]
+    ;; (println "STEP: " step " KNOWLEDGE: " knowledge)
     (swap! state #(assoc-in % [:common-knowledge step] knowledge))))
-
-  ; FIX THIS SHIT
-(defn join-states [moved-state jumped-state]
-  (let [platform (get-in jumped-state [:active-players :0])
-        first-step (get-in jumped-state [:active-players :1])
-        bridge (dissoc (get moved-state :active-players) :0 :1)]
-    (println "***MOVED STATE***")
-    (println moved-state)
-    (println "***JUMPED STATE***")
-    (println jumped-state)
-    (println "***PLATFORM***")
-    (println {:0 platform})
-    (println "***FIRST STEP***")
-    (println {:1 first-step})
-    (println "***BRIDGE***")
-    (println bridge)
-    (println "***MERGED***")
-    (println (merge {:0 platform} {:1 first-step} bridge))
-    {
-      :active-players (merge {:0 platform} {:1 first-step} bridge)
-      :dead-players (:dead-players jumped-state)
-      :survivors (:survivors jumped-state)
-      :common-knowledge (:common-knowledge moved-state)
-    }))
 
 ;jumped-state and state
 (defn tick [state tempered-steps]
-  (let [jumped-state (future (maybe-jump @state))]
-    (swap! state maybe-move)
-    (swap! state join-states @jumped-state)
-  )
+  (swap! state maybe-move)
+  (swap! state maybe-jump)
   (end-of-tick state tempered-steps))
 
 (defn -main []
