@@ -33,12 +33,13 @@
     (if (empty? tributes)
       state
       (let [chosen-one (rand-nth tributes)
-            player-move (players/jump chosen-one (:common-knowledge state))
+            player-move (players/perfect-jump chosen-one (:common-knowledge state))
             disjoint-state (update-in state [:active-players 0] disj chosen-one)]
-        (when (empty? (get-in state [:active-players 1]))
-          (println "SOMEBODY IS JUMPING! PLAYER: " (:id chosen-one))
-          (swap! (:location chosen-one) inc)
-          (assoc-in disjoint-state [:active-players 1] #{chosen-one})
+        (if (empty? (get-in state [:active-players 1]))
+          (do
+            (swap! (:location chosen-one) inc)
+            (assoc-in disjoint-state [:active-players 1] #{chosen-one}))
+          state
         )))))
 
 (defn next-step [location state]
@@ -73,8 +74,9 @@
       (println "STEP: " step " PLAYER: " players)
       (when-let [player (first players)]
         (when-let [next-step (next-step step state)]
-          (when-let [player-move (players/move player common-knowledge)]
+          (when-let [player-move (players/perfect-move player tempered-steps)]
             (println "NOT EMPTY AT STEP " step " WITH PLAYER " (:id player) " PLAYER MOVE: " player-move)
+            (swap! (:location player) inc)
             (swap! bridge update step disj player)
             (swap! bridge update next-step conj player)
             ))))

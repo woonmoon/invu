@@ -12,7 +12,7 @@
     ; Clojure is dynamically typed so this black magic is legal
     (if (or (> (:will-to-live player) 0) (not (empty? common-knowledge)))
         (do
-            (println "Player " (:id player) " IS WILLING TO LEAP")
+            (println (:id player) " IS WILLING TO LEAP")
             player)
         nil))
 
@@ -24,6 +24,11 @@
         (let [choice (rand-int 2)]
             (reset! (:decision player) choice)
             choice)))
+
+(defn perfect-jump [player _]
+    "A brave player will jump to the next step."
+    (reset! (:decision player) 0)
+    0)
 
 (defn move [player common-knowledge]
     "A small step for one player, one giant leap for playerkind.
@@ -42,4 +47,13 @@
                 next-step) 
             nil)))
 
-    ;; TODO WRAP BRIDGE IN ATOM
+(defn perfect-move [player common-knowledge]
+    "A small step for one player, one giant leap for playerkind.
+    Players should follow common knowledge if available.
+    If will-to-live > 5, will move to a random direction.
+    Returns true if player moved else false."
+    (let [location @(:location player)
+          next-step (get common-knowledge (inc location))]
+        (println "AT LOCATION " location " NEXT STEP IS " next-step)
+        (reset! (:decision player) next-step)
+        next-step))
