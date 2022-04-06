@@ -10,9 +10,10 @@
     "Given a player on the lower platform decides if she wants to jump ship."
     ; Currently a random decision weighted on will-to-live.
     ; Clojure is dynamically typed so this black magic is legal
-    (if (or (> (* (rand-int 2) (:will-to-live player)) 0) 
-            (not (empty? common-knowledge)))
-        player
+    (if (or (> (:will-to-live player) 0) (not (empty? common-knowledge)))
+        (do
+            (println "Player " (:id player) " IS WILLING TO LEAP")
+            player)
         nil))
 
 ; TODO: merge functions jump and move, they're the same thing.
@@ -30,12 +31,13 @@
     If will-to-live > 5, will move to a random direction.
     Returns true if player moved else false."
     (let [location @(:location player)
-          knowledge-available (contains? common-knowledge location)
+          knowledge-available (contains? common-knowledge (inc location))
           will-jump (or knowledge-available (> (:will-to-live player) 0))
-          next-step (if knowledge-available [(keyword (str location)) common-knowledge]
+          next-step (if knowledge-available (get common-knowledge (inc location))
                                             (rand-int 2))]
         (if will-jump 
             (do
+                (println "WILLING TO JUMP")
                 (reset! (:decision player) next-step)
                 next-step) 
             nil)))

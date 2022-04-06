@@ -5,7 +5,7 @@
             [invu.domain :as domain])
   (:gen-class))
 
-(defonce tempered-steps {:1 0, :2 1, :3 0, :4 1, :5 0, :6 0})
+(defonce tempered-steps {1 0, 2 1, 3 0, 4 1, 5 0, 6 0})
 
 (defonce new-state
   (atom { :active-players {}
@@ -16,31 +16,37 @@
 (defn init-state [state num-steps]
   (let [num-entries (inc num-steps)
         bridge (zipmap 
-                  (map #(keyword (str %)) (range num-entries)) 
+                  (range num-entries)
                   (take num-entries (repeat #{})))]
     (swap! state assoc :active-players bridge)))
 
 (defn spawn-players [state num-players]
   (let [ids (take num-players (repeatedly #(gensym "Player")))
         players (into #{} (map (partial players/init-player) ids))]
-    (swap! state assoc-in [:active-players :0] players)))
+    (swap! state assoc-in [:active-players 0] players)))
 
 (defn maybe-jump [state]
   "I volunteer as tribute!"
-  (let [candidates (get-in state [:active-players :0])
+  (let [candidates (get-in state [:active-players 0])
         tributes (remove nil? 
                     (map #(players/decide-jump % (:common-knowledge state)) candidates))]
     (if (empty? tributes)
       state
       (let [chosen-one (rand-nth tributes)
             player-move (players/jump chosen-one (:common-knowledge state))
-            disjoint-state (update-in state [:active-players :0] disj chosen-one)]
-            (swap! (:location chosen-one) inc)
-            (assoc-in disjoint-state [:active-players :1] #{chosen-one})))))
+            disjoint-state (update-in state [:active-players 0] disj chosen-one)]
+        (when (empty? (get-in state [:active-players 1]))
+          (println "SOMEBODY IS JUMPING! PLAYER: " (:id chosen-one))
+          (swap! (:location chosen-one) inc)
+          (assoc-in disjoint-state [:active-players 1] #{chosen-one})
+        )))))
 
-(defn can-jump [location state]
+(defn next-step [location state]
   "Check if the next step of the bridge is occupied or not."
-  (empty? (get-in state [:active-players (keyword (str (inc location)))])))
+  (let [next-step (inc location)]
+    (if (empty? (get-in state [:active-players next-step]))
+      next-step
+      nil)))
 
 (defn find-players [step]
   "If the step is occupied return the map of occupants, if none return nil"
@@ -50,22 +56,30 @@
     :default nil))
 
 (defn maybe-move [state]
-  (let [platform (get-in state [:active-players :0])
-        bridge (atom (dissoc (:active-players state) :0))
+  (let [platform (get-in state [:active-players 0])
+        bridge (atom (into (sorted-map-by >) (dissoc (:active-players state) 0)))
         common-knowledge (:common-knowledge state)]
-    (doseq [[step players] @bridge
-            :when (not (empty? players))
-            :let [player (first players)]
-            :let [location @(:location player)]
-            :when (can-jump location state)
-            :let [player-move (players/move player common-knowledge)]
-            :when (not (nil? player-move))]
-      (println "Moving player: " (:id player))
-      (swap! bridge #(update % step disj player))
-      (swap! bridge #(update % (keyword (str (inc location))) conj player)))
-    ;; (println "***ASSOC STATE***")
-    ;; (println (assoc state :active-players (merge {:0 platform} @bridge)))
-    (assoc state :active-players (merge {:0 platform} @bridge))))
+    ;; (doseq [[step players] @bridge
+    ;;         :when (not (empty? players))
+    ;;         :let [player (first players)]
+    ;;         :let [location @(:location player)]
+    ;;         :when (can-jump location state)
+    ;;         :let [player-move (players/move player common-knowledge)]
+    ;;         :when (not (nil? player-move))]
+    ;;   (println "Moving player: " (:id player))
+    ;;   (swap! bridge #(update % step disj player))
+    ;;   (swap! bridge #(update % (inc location) conj player)))
+    (doseq [[step players] @bridge]
+      (println "STEP: " step " PLAYER: " players)
+      (when-let [player (first players)]
+        (when-let [next-step (next-step step state)]
+          (when-let [player-move (players/move player common-knowledge)]
+            (println "NOT EMPTY AT STEP " step " WITH PLAYER " (:id player) " PLAYER MOVE: " player-move)
+            (swap! bridge update step disj player)
+            (swap! bridge update next-step conj player)
+            ))))
+    (println "BRIDGE: " (into (sorted-map) @bridge))
+    (assoc state :active-players (merge {0 platform} (into (sorted-map) @bridge)))))
 
 (defn find-leading-step [active-players]
   (first 
@@ -89,7 +103,7 @@
     ;; (println "LEADING PLAYER: " leading-player)
     ;; (println "CORRECT STEP: " correct-step)
     ;; (println "LEADING DECISION: " @(:decision leading-player))
-    (if (or (= :0 leading-step) (contains? common-knowledge leading-step))
+    (if (or (= 0 leading-step) (contains? common-knowledge leading-step))
       nil
       (if (= correct-step @(:decision leading-player))
         [leading-step correct-step]
@@ -127,6 +141,11 @@
   (println "********START TICK 3********")
   (tick new-state tempered-steps)
   (println "********FINAL TICK 3 STATE********")
+  (println @new-state)
+  (newline)
+  (println "********START TICK 4********")
+  (tick new-state tempered-steps)
+  (println "********FINAL TICK 4 STATE********")
   (println @new-state)
   (newline)
   (shutdown-agents)
