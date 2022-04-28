@@ -6,7 +6,7 @@
             [invu.logger :as log])
   (:gen-class))
 
-(defonce tempered-steps {1 0, 2 1, 3 0, 4 1, 5 0, 6 0})
+(defonce tempered-steps (atom {1 0, 2 1, 3 0, 4 1, 5 0, 6 0}))
 
 (defonce new-state
   (atom { :active-players {}
@@ -47,7 +47,7 @@
 (defn next-step [location bridge]
   "Check if the next step of the bridge is occupied or not."
   (let [next-step (inc location)]
-    (if (empty? (get @bridge next-step))
+    (if (and (empty? (get @bridge next-step)) (<= next-step (count @bridge)))
       next-step
       nil)))
 
@@ -57,11 +57,8 @@
         common-knowledge (:common-knowledge state)]
     (doseq [[step players] @bridge]
       (when-let [player (first players)]
-        (println "PLAYER: " player)
         (when-let [next-step (next-step step bridge)]
-          (println "NEXT STEP: " next-step)
           (when-let [player-move (players/move player (:common-knowledge state))]
-            (println "NOT EMPTY AT STEP " step " WITH PLAYER " (:id player) " PLAYER MOVE: " player-move)
             (swap! (:location player) inc)
             (swap! bridge update step disj player)
             (swap! bridge update next-step conj player)
@@ -85,15 +82,15 @@
 ; Somebody stepped forward and survived
 ; Somebody made it to the end of the bridge
 (defn find-correct-step [state tempered-steps]
-  (if (= (:common-knowledge @state) tempered-steps)
-    (let [last-step (first (last tempered-steps))
+  (if (= (:common-knowledge @state) @tempered-steps)
+    (let [last-step (first (last @tempered-steps))
           surviving-player (first (get-in @state [:active-players last-step]))]
       (swap! state #(update-in % [:active-players last-step] disj surviving-player))
       (swap! state #(update-in % [:survivors] conj surviving-player))
       nil)
     (let [leading-step (find-leading-step (into (sorted-map) (:active-players @state)))
           leading-player (first (get-in @state [:active-players leading-step]))
-          correct-step (get tempered-steps leading-step)
+          correct-step (get @tempered-steps leading-step)
           common-knowledge (:common-knowledge @state)]
         (if (or (= 0 leading-step) (contains? common-knowledge leading-step))
           nil
