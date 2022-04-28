@@ -11,9 +11,7 @@
     ; Currently a random decision weighted on will-to-live.
     ; Clojure is dynamically typed so this black magic is legal
     (if (or (> (:will-to-live player) 0) (not (empty? common-knowledge)))
-        (do
-            (println (:id player) " IS WILLING TO LEAP")
-            player)
+        player
         nil))
 
 ; TODO: merge functions jump and move, they're the same thing.
@@ -23,7 +21,8 @@
         (first common-knowledge) 
         (let [choice (rand-int 2)]
             (reset! (:decision player) choice)
-            choice)))
+            choice))
+)
 
 (defn perfect-jump [player _]
     "A brave player will jump to the next step."
@@ -40,9 +39,9 @@
           will-jump (or knowledge-available (> (:will-to-live player) 0))
           next-step (if knowledge-available (get common-knowledge (inc location))
                                             (rand-int 2))]
+        (println "WILL I MOVE")
         (if will-jump 
             (do
-                (println "WILLING TO JUMP")
                 (reset! (:decision player) next-step)
                 next-step) 
             nil)))
