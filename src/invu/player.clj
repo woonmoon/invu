@@ -39,7 +39,6 @@
           will-jump (or knowledge-available (> (:will-to-live player) 0))
           next-step (if knowledge-available (get common-knowledge (inc location))
                                             (rand-int 2))]
-        (println "WILL I MOVE")
         (if will-jump 
             (do
                 (reset! (:decision player) next-step)
