@@ -11,16 +11,17 @@
             (log-step step players))))
 
 (defn log-state [state] 
-    (println "Tick: " (:tick @state))
-    (println "Active Players: " (count (apply set/union (vals (:active-players @state)))))
+    (println "Tick:" (:tick @state))
+    (println "Active Players:" (count (apply set/union (vals (:active-players @state)))))
     (do
-        (print "Bridge: ") 
+        (print "Bridge:") 
         (log-bridge state)
         (newline))
-    (println "Dead Players: " (count (:dead-players @state)))
-    (println "Survivors: " (count (:survivors @state)))
+    (println "Dead Players:" (count (:dead-players @state)))
+    (println "Survivors:" (count (:survivors @state)))
     (do
         (print (into [] (map #(:id %) (:survivors @state))))
         (newline))
+    (println "Tempered Steps:" (:tempered-steps @state))
     (println "Common Knowledge: " (:common-knowledge @state))
     (newline))

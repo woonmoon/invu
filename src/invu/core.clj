@@ -20,9 +20,10 @@
         bridge (zipmap 
                   (range num-entries)
                   (take num-entries (repeat #{})))
-        tempered-steps (zipmap
-                          (range 1 num-entries)
-                          (take num-steps (repeatedly #(rand-int 2))))]
+        tempered-steps (into (sorted-map)
+                          (zipmap
+                            (range 1 num-entries)
+                            (take num-steps (repeatedly #(rand-int 2)))))]
     (swap! state assoc :active-players bridge)
     (swap! state assoc :tempered-steps tempered-steps)))
 
@@ -60,11 +61,11 @@
         common-knowledge (:common-knowledge state)]
     (doseq [[step players] @bridge]
       (when-let [player (first players)]
-        (println "PLAYER MOVING:" (:id player))
+        ;; (println "PLAYER MOVING:" (:id player))
         (when-let [next-step (next-step step bridge)]
-          (println "NEXT STEP:" next-step)
+          ;; (println "NEXT STEP:" next-step)
           (when-let [player-move (players/move player (:common-knowledge state))]
-            (println "PLAYER MOVE:" player-move)
+            ;; (println "PLAYER MOVE:" player-move)
             (swap! (:location player) inc)
             (swap! bridge update step disj player)
             (swap! bridge update next-step conj player)))))
@@ -90,35 +91,29 @@
 ; Somebody stepped forward and survived
 ; Somebody made it to the end of the bridge
 
-; 1. Check first if 
-; 2. 
 (defn find-correct-step [state]
   (let [last-step (first (last (:tempered-steps @state)))
         leading-step (find-leading-step (into (sorted-map) (:active-players @state)))
         leading-player (first (get-in @state [:active-players leading-step]))
         correct-step (get-in @state [:tempered-steps leading-step])
         common-knowledge (:common-knowledge @state)]
-      (println "TEMPERED STEPS:" (get @state :tempered-steps))
-      (println "LEADING STEP:" leading-step "LAST STEP:" last-step "LEADING PLAYER:" (:id leading-player) "CORRECT STEP:" correct-step "PLAYER CHOICE:" @(:decision leading-player))
+      ; (println "LEADING STEP:" leading-step "LAST STEP:" last-step "LEADING PLAYER:" (:id leading-player) "CORRECT STEP:" correct-step "PLAYER CHOICE:" @(:decision leading-player))
       (if (or (= 0 leading-step) (and (contains? common-knowledge leading-step) (not= leading-step last-step)))
         nil
         (if (= correct-step @(:decision leading-player))
+          (if (= leading-step last-step)
           (do
-            (println "CORRECT STEP IS LEAD DECISION LEADING-STEP:" leading-step "LAST STEP:" last-step)
-            (if (= leading-step last-step)
-              (do
-                (println "CELINE DION")
-                (survive state leading-player)
-                nil)
-              [leading-step correct-step]))
+            (survive state leading-player)
+            nil)
+          [leading-step correct-step])
           (do
             (kill state leading-step leading-player)
-            [leading-step (util/other-direction @(:decision leading-player))]))))
-)
+            [leading-step (util/other-direction @(:decision leading-player))])))))
 
 (defn end-of-tick [state]
   (when-let [[step knowledge] (find-correct-step state)]
-    (swap! state assoc-in [:common-knowledge step] knowledge)))
+    (swap! state assoc-in [:common-knowledge step] knowledge)
+    (swap! state update :common-knowledge #(into (sorted-map) %))))
 
 ;jumped-state and state
 (defn tick [state]
@@ -137,8 +132,8 @@
     (log/log-state new-state)))
 
 (defn -main []
-  (init-state new-state 6)
-  (spawn-players new-state 6)
+  (init-state new-state 10)
+  (spawn-players new-state 100)
   (log/log-state new-state)
   (start-simulation new-state 50)
   (shutdown-agents)

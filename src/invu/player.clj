@@ -39,7 +39,7 @@
           will-jump (or knowledge-available (>= (:will-to-live player) 0))
           next-step (if knowledge-available (get common-knowledge (inc location))
                                             (rand-int 2))]
-        (println "PLAYER:" (:id player) "KNOWLEDGE AV:" knowledge-available "WILL JUMP:" will-jump "NEXT STEP:" next-step "WILL TO LIVE:" (:will-to-live player))
+        ;; (println "PLAYER:" (:id player) "KNOWLEDGE AV:" knowledge-available "WILL JUMP:" will-jump "NEXT STEP:" next-step "WILL TO LIVE:" (:will-to-live player))
         (if will-jump 
             (do
                 (reset! (:decision player) next-step)
