@@ -3,7 +3,7 @@
     (:require [invu.util :as util]))
 
 (defn log-step [step players]
-    (print "{" step ": " (into [] (map #(:id %) players)) "} "))
+    (print "{" step ":" (into [] (map #(:id %) players)) "} "))
 
 (defn log-bridge [state]
     (let [bridge (into (sorted-map) (dissoc (:active-players @state) 0))]
@@ -19,5 +19,8 @@
         (newline))
     (println "Dead Players: " (count (:dead-players @state)))
     (println "Survivors: " (count (:survivors @state)))
+    (do
+        (print (into [] (map #(:id %) (:survivors @state))))
+        (newline))
     (println "Common Knowledge: " (:common-knowledge @state))
     (newline))

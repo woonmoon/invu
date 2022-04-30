@@ -1,6 +1,7 @@
 (ns invu.core
   (:import (javax.swing JPanel))
-  (:require [invu.util :as util]
+  (:require [clojure.set :as set]
+            [invu.util :as util]
             [invu.player :as players]
             [invu.domain :as domain]
             [invu.logger :as log])
@@ -59,8 +60,11 @@
         common-knowledge (:common-knowledge state)]
     (doseq [[step players] @bridge]
       (when-let [player (first players)]
+        (println "PLAYER MOVING:" (:id player))
         (when-let [next-step (next-step step bridge)]
+          (println "NEXT STEP:" next-step)
           (when-let [player-move (players/move player (:common-knowledge state))]
+            (println "PLAYER MOVE:" player-move)
             (swap! (:location player) inc)
             (swap! bridge update step disj player)
             (swap! bridge update next-step conj player)))))
@@ -77,31 +81,40 @@
   (swap! state #(update-in % [:active-players step] disj player))
   (swap! state #(update-in % [:dead-players] conj player)))
 
+(defn survive [state player]
+  (swap! state #(update-in % [:active-players (first (last (:tempered-steps @state)))] disj player))
+  (swap! state #(update-in % [:survivors] conj player)))
+
 ; Nobody stepped forward
 ; Somebody stepped forward and died
 ; Somebody stepped forward and survived
 ; Somebody made it to the end of the bridge
+
+; 1. Check first if 
+; 2. 
 (defn find-correct-step [state]
-  (if (= (:common-knowledge @state) (:tempered-steps @state))
-    (let [last-step (first (last (:tempered-steps @state)))
-          surviving-player (first (get-in @state [:active-players last-step]))]
-      (swap! state #(update-in % [:active-players last-step] disj surviving-player))
-      (swap! state #(update-in % [:survivors] conj surviving-player))
-      nil)
-    (let [leading-step (find-leading-step (into (sorted-map) (:active-players @state)))
-          leading-player (first (get-in @state [:active-players leading-step]))
-          correct-step (get-in @state [:tempered-steps leading-step])
-          common-knowledge (:common-knowledge @state)]
-        (println "TEMPERED STEPS:" (get @state :tempered-steps))
-        (println "LEADING STEP:" leading-step "LEADING PLAYER:" (:id leading-player) "CORRECT STEP:" correct-step)
-        (if (or (= 0 leading-step) (contains? common-knowledge leading-step))
-          nil
-          (if (= correct-step @(:decision leading-player))
-            [leading-step correct-step]
-            (do
-              (kill state leading-step leading-player)
-              [leading-step (util/other-direction @(:decision leading-player))]))))
-  ))
+  (let [last-step (first (last (:tempered-steps @state)))
+        leading-step (find-leading-step (into (sorted-map) (:active-players @state)))
+        leading-player (first (get-in @state [:active-players leading-step]))
+        correct-step (get-in @state [:tempered-steps leading-step])
+        common-knowledge (:common-knowledge @state)]
+      (println "TEMPERED STEPS:" (get @state :tempered-steps))
+      (println "LEADING STEP:" leading-step "LAST STEP:" last-step "LEADING PLAYER:" (:id leading-player) "CORRECT STEP:" correct-step "PLAYER CHOICE:" @(:decision leading-player))
+      (if (or (= 0 leading-step) (and (contains? common-knowledge leading-step) (not= leading-step last-step)))
+        nil
+        (if (= correct-step @(:decision leading-player))
+          (do
+            (println "CORRECT STEP IS LEAD DECISION LEADING-STEP:" leading-step "LAST STEP:" last-step)
+            (if (= leading-step last-step)
+              (do
+                (println "CELINE DION")
+                (survive state leading-player)
+                nil)
+              [leading-step correct-step]))
+          (do
+            (kill state leading-step leading-player)
+            [leading-step (util/other-direction @(:decision leading-player))]))))
+)
 
 (defn end-of-tick [state]
   (when-let [[step knowledge] (find-correct-step state)]
@@ -118,8 +131,8 @@
   (swap! state update :tick inc))
 
 (defn start-simulation [state num-ticks]
-  (while (and (< (:tick @state) num-ticks) 
-              (not (empty? (:active-players @state))))
+  (while (and (< (:tick @state) num-ticks)
+              (not (empty? (apply set/union (vals (:active-players @state))))))
     (tick new-state)
     (log/log-state new-state)))
 
