@@ -21,8 +21,7 @@
         (first common-knowledge) 
         (let [choice (rand-int 2)]
             (reset! (:decision player) choice)
-            choice))
-)
+            choice)))
 
 (defn perfect-jump [player _]
     "A brave player will jump to the next step."

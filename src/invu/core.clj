@@ -79,12 +79,12 @@
       (filter #(not (empty? (second %))) (reverse active-players)))))
 
 (defn kill [state step player]
-  (swap! state #(update-in % [:active-players step] disj player))
-  (swap! state #(update-in % [:dead-players] conj player)))
+  (swap! state update-in [:active-players step] disj player)
+  (swap! state update-in [:dead-players] conj player))
 
 (defn survive [state player]
-  (swap! state #(update-in % [:active-players (first (last (:tempered-steps @state)))] disj player))
-  (swap! state #(update-in % [:survivors] conj player)))
+  (swap! state update-in [:active-players (first (last (:tempered-steps @state)))] disj player)
+  (swap! state update-in [:survivors] conj player))
 
 ; Nobody stepped forward
 ; Somebody stepped forward and died
@@ -115,7 +115,6 @@
     (swap! state assoc-in [:common-knowledge step] knowledge)
     (swap! state update :common-knowledge #(into (sorted-map) %))))
 
-;jumped-state and state
 (defn tick [state]
   ; (println "BEFORE MAYBE MOVE")
   (swap! state maybe-move)
@@ -136,5 +135,4 @@
   (spawn-players new-state 100)
   (log/log-state new-state)
   (start-simulation new-state 50)
-  (shutdown-agents)
-)
+  (shutdown-agents))
