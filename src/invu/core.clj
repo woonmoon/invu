@@ -29,7 +29,7 @@
 
 (defn spawn-players [state num-players]
   (let [ids (take num-players (repeatedly #(gensym "Player")))
-        players (into #{} (map (partial players/init-player) ids))]
+        players (into #{} (map #(players/->Random % (atom 0) (rand-int 10) (atom nil))) ids)]
     (swap! state assoc-in [:active-players 0] players)))
 
 (defn maybe-jump [state]
