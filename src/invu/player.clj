@@ -2,12 +2,12 @@
     (:require [invu.util :as util]))
 
 (defprotocol Player
-    (decide-jump [player common-knowledge])
+    (decide-jump [player common-knowledge timer num-players])
     (jump [player common-knowledge])
     (move [player common-knowledge]))
 
 (defrecord Random [id location will-to-live decision] Player
-    (decide-jump [player common-knowledge]
+    (decide-jump [player common-knowledge _ _]
         (if (or (>= (:will-to-live player) 0) (not (empty? common-knowledge)))
             player
             nil))

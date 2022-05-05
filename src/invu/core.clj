@@ -12,10 +12,11 @@
           :dead-players #{}
           :survivors #{}
           :common-knowledge {}
+          :timer nil
           :tick 0 
           :tempered-steps {} }))
 
-(defn init-state [state num-steps]
+(defn init-state [state num-steps num-ticks]
   (let [num-entries (inc num-steps)
         bridge (zipmap 
                   (range num-entries)
@@ -25,7 +26,8 @@
                             (range 1 num-entries)
                             (take num-steps (repeatedly #(rand-int 2)))))]
     (swap! state assoc :active-players bridge)
-    (swap! state assoc :tempered-steps tempered-steps)))
+    (swap! state assoc :tempered-steps tempered-steps)
+    (swap! state assoc :timer num-ticks)))
 
 (defn spawn-players [state num-players]
   (let [ids (take num-players (repeatedly #(gensym "Player")))
@@ -36,7 +38,7 @@
   "I volunteer as tribute!"
   (let [candidates (get-in state [:active-players 0])
         tributes (remove nil? 
-                    (map #(players/decide-jump % (:common-knowledge state)) candidates))]
+                    (map #(players/decide-jump % (:common-knowledge state) (:timer state) (count (get-in state [:active-players 0]))) candidates))]
     (if (empty? tributes)
       state
       (let [chosen-one (rand-nth tributes)
@@ -90,7 +92,7 @@
 ; Somebody stepped forward and died
 ; Somebody stepped forward and survived
 ; Somebody made it to the end of the bridge
-
+;; Fix this.
 (defn find-correct-step [state]
   (let [last-step (first (last (:tempered-steps @state)))
         leading-step (find-leading-step (into (sorted-map) (:active-players @state)))
@@ -116,23 +118,20 @@
     (swap! state update :common-knowledge #(into (sorted-map) %))))
 
 (defn tick [state]
-  ; (println "BEFORE MAYBE MOVE")
   (swap! state maybe-move)
-  ; (println "BEFORE MAYBE JUMP")
   (swap! state maybe-jump)
-  ; (println "BEFORE EOT")
   (end-of-tick state)
   (swap! state update :tick inc))
 
-(defn start-simulation [state num-ticks]
-  (while (and (< (:tick @state) num-ticks)
+(defn start-simulation [state]
+  (while (and (< (:tick @state) (:timer @state))
               (not (empty? (apply set/union (vals (:active-players @state))))))
     (tick new-state)
     (log/log-state new-state)))
 
 (defn -main []
-  (init-state new-state 10)
-  (spawn-players new-state 100)
+  (init-state new-state 5 10)
+  (spawn-players new-state 10)
   (log/log-state new-state)
-  (start-simulation new-state 50)
+  (start-simulation new-state)
   (shutdown-agents))
