@@ -14,7 +14,8 @@
           :common-knowledge {}
           :timer nil
           :tick 0 
-          :tempered-steps {} }))
+          :tempered-steps {} 
+        }))
 
 (defn init-state [state num-steps num-ticks]
   (let [num-entries (inc num-steps)

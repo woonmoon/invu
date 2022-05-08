@@ -22,3 +22,15 @@
 (defn rand-offset [lower-bound offset]
     "Generates number between lower-bound (inclusive) and upwards by offset (exclusive)"
     (rand-range lower-bound (+ lower-bound offset)))
+
+(defn one-and-only [coll] {:pre [(nil? (next coll))]}
+    "Returns the one and only item in a list, throws if there is more than one item." 
+    (first coll))
+
+(defmacro fuzzy-classify [bounds label x]
+    "Returns label if x is within bounds otherwise returns nil"
+    `(let [x# ~x
+            upper# (first ~bounds)
+            lower# (second ~bounds)]
+            (when (and (<= upper# x#) (< x# lower#))
+                    ~label)))
