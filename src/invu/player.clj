@@ -1,27 +1,22 @@
 (ns invu.player
     (:require [invu.util :as util]))
 
-(defprotocol Player
-    (decide-jump [player common-knowledge timer num-players])
-    (jump [player common-knowledge])
-    (move [player common-knowledge]))
-
 (defonce cooperation-thresholds
     {
-        [0.0 0.2] :VLO
-        [0.2 0.4] :LO
-        [0.4 0.6] :MID
-        [0.6 0.8] :HI
-        [0.8 1.0] :VHI
+        0.2 :VLO
+        0.4 :LO
+        0.6 :MID
+        0.8 :HI
+        1.0 :VHI
     })
 
 (defonce aggression-thresholds
     {
-        [0.0 0.2] :VLO
-        [0.2 0.4] :LO
-        [0.4 0.6] :MID
-        [0.6 0.8] :HI
-        [0.8 1.0] :VHI
+        0.2 :VLO
+        0.4 :LO
+        0.6 :MID
+        0.8 :HI
+        1.0 :VHI
     })
 
 (defonce cooperation-to-min-common-cooperation
@@ -42,13 +37,32 @@
         :VHI    0.8
     })
 
-(defmacro )
+(defprotocol Player
+    (will-jump [player common-knowledge common-cooperation])
+    (jump [player common-knowledge])
+    (move [player common-knowledge]))
 
-(defrecord Random [id location will-to-live decision] Player
-    (decide-jump [player common-knowledge _ _]
-        (if (or (>= (:will-to-live player) 0) (not (empty? common-knowledge)))
-            player
-            nil))
+
+(defrecord Random [id location will-to-live aggression cooperation decision] Player
+    (will-jump [player common-knowledge common-cooperation]
+        (let 
+            [fuzzy-cooperation 
+                (util/fuzzy-label cooperation-thresholds @(:cooperation player))
+             fuzzy-aggression 
+                (util/fuzzy-label aggression-thresholds @(:aggression player))
+             min-common-cooperation
+                (get cooperation-to-min-common-cooperation fuzzy-cooperation)
+             min-will-to-live
+                (get aggression-to-min-will-to-live fuzzy-aggression)
+             cooperation-desire 
+                (util/desire min-common-cooperation common-cooperation)
+             will-to-live-desire
+                (util/desire min-will-to-live @(:will-to-live player))]
+            (cond
+                (contains? common-knowledge (inc @(:location player))) 
+                    [1.0 player]
+                (and (pos? cooperation-desire) (pos? will-to-live-desire))
+                    [(+ cooperation-desire will-to-live-desire) player])))
 
     (jump [player common-knowledge]
         (if (not (empty? common-knowledge)) 
@@ -60,7 +74,7 @@
     (move [player common-knowledge]
         (let [location @(:location player)
           knowledge-available (contains? common-knowledge (inc location))
-          will-jump (or knowledge-available (>= (:will-to-live player) 0))
+          will-jump (or knowledge-available (>= @(:will-to-live player) 0))
           next-step (if knowledge-available (get common-knowledge (inc location))
                                             (rand-int 2))]
             (if will-jump 
@@ -96,22 +110,17 @@
 ;; Lo    | 0.7 / 0.8 | 0.7 / 0.7 | 0.7 / 0.6 | 0.7 / 0.5 | 0.7 / 0.4
 ;; VLo   | 0.8 / 0.8 | 0.8 / 0.7 | 0.8 / 0.6 | 0.8 / 0.5 | 0.8 / 0.4
 
-(defn fuzzy-label [thresholds score]
-    "Returns "
-    (util/one-and-only 
-            (remove nil? 
-                    (map #(util/fuzzy-classify (first %) (second %) score) thresholds))))
-
-(defn will-move [player cooperation aggression common-knowledge]
-    "Returns true if 
-        a)  Common knowledge for the correct next step is available
-        b)  Common cooperation and individual will to live meet the fuzzy thresholds
-            of (individual) cooperation and aggression.
-    else returns nil"
-    (let [next-step (inc @(:location player))
-          fuzzy-cooperation (fuzzy-label cooperation-thresholds @(:cooperation player))
-          fuzzy-aggression (fuzzy-label aggression-thresholds @(:aggression player))]
-        (when (or (contains? common-knowledge next-step) (meets-fuzzy-condition )) true)))
+;; (defn will-move [player cooperation aggression common-knowledge]
+;;     "Returns true if 
+;;         a)  Common knowledge for the correct next step is available
+;;         b)  Common cooperation and individual will to live meet the fuzzy thresholds
+;;             of (individual) cooperation and aggression.
+;;     else returns nil"
+;;     (let [next-step (inc @(:location player))
+;;           fuzzy-cooperation (fuzzy-label cooperation-thresholds @(:cooperation player))
+;;           fuzzy-aggression (fuzzy-label aggression-thresholds @(:aggression player))]
+;;         (when (or   (contains? common-knowledge next-step) 
+;;                     (jump-condition-met )) true)))
 
 ;; (defn perfect-jump [player _]
 ;;     "A brave player will jump to the next step."

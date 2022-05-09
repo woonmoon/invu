@@ -9,11 +9,13 @@
 
 (defonce new-state
   (atom { :active-players {}
-          :dead-players #{}
+          :dead-players #{} 
           :survivors #{}
           :common-knowledge {}
           :timer nil
           :tick 0 
+          :common-cooperation 0
+          :chance-of-death nil
           :tempered-steps {} 
         }))
 
@@ -31,32 +33,33 @@
     (swap! state assoc :timer num-ticks)))
 
 (defn spawn-players [state num-players]
-  (let [ids (take num-players (repeatedly #(gensym "Player")))
-        players (into #{} (map #(players/->Random % (atom 0) (rand-int 10) (atom nil))) ids)]
+  (let [players 
+          (into #{}
+            (repeatedly num-players 
+              #(players/->Random (gensym "Player") (atom 0) (atom (rand)) (atom (rand)) (atom (rand)) (atom nil))))]
     (swap! state assoc-in [:active-players 0] players)))
 
 (defn maybe-jump [state]
   "I volunteer as tribute!"
   (let [candidates (get-in state [:active-players 0])
-        tributes (remove nil? 
-                    (map #(players/decide-jump % (:common-knowledge state) (:timer state) (count (get-in state [:active-players 0]))) candidates))]
-    (if (empty? tributes)
+        tributes (into (sorted-map) 
+                    (remove nil?
+                      (map 
+                        #(players/will-jump % (:common-knowledge state) (:common-cooperation state)) 
+                        candidates)))]
+    (if (or (empty? tributes) (seq (get-in state [:active-players 1])))
       state
-      (let [chosen-one (rand-nth tributes)
+      (let [chosen-one (second (first tributes))
             player-move (players/jump chosen-one (:common-knowledge state))
             disjoint-state (update-in state [:active-players 0] disj chosen-one)]
-        (if (empty? (get-in state [:active-players 1]))
-          (do
-            (swap! (:location chosen-one) inc)
-            (assoc-in disjoint-state [:active-players 1] #{chosen-one}))
-          state)))))
+        (swap! (:location chosen-one) inc)
+        (assoc-in disjoint-state [:active-players 1] #{chosen-one})))))
 
 (defn next-step [location bridge]
   "Check if the next step of the bridge is occupied or not."
   (let [next-step (inc location)]
-    (if (and (empty? (get @bridge next-step)) (<= next-step (count @bridge)))
-      next-step
-      nil)))
+    (when (and (empty? (get @bridge next-step)) (<= next-step (count @bridge)))
+      next-step)))
 
 (defn maybe-move [state]
   (let [platform (get-in state [:active-players 0])
@@ -132,7 +135,7 @@
 
 (defn -main []
   (init-state new-state 5 10)
-  (spawn-players new-state 10)
+  (spawn-players new-state 3)
   (log/log-state new-state)
   (start-simulation new-state)
   (shutdown-agents))

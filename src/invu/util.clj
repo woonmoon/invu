@@ -23,14 +23,16 @@
     "Generates number between lower-bound (inclusive) and upwards by offset (exclusive)"
     (rand-range lower-bound (+ lower-bound offset)))
 
-(defn one-and-only [coll] {:pre [(nil? (next coll))]}
-    "Returns the one and only item in a list, throws if there is more than one item." 
-    (first coll))
+(defmacro fuzzy-label [thresholds x]
+    "Returns correct fuzzy label given thresholds and score x."
+    `(let [ x# ~x
+            thresholds# (into (sorted-map) ~thresholds)]
+                (first 
+                    (remove nil? 
+                        (map #(when (> (first %) x#) (second %)) thresholds#)))))
 
-(defmacro fuzzy-classify [bounds label x]
-    "Returns label if x is within bounds otherwise returns nil"
+(defmacro desire [minimum-threshold x]
+    "Returns how much the agent wants to act."
     `(let [x# ~x
-            upper# (first ~bounds)
-            lower# (second ~bounds)]
-            (when (and (<= upper# x#) (< x# lower#))
-                    ~label)))
+            minimum-threshold# ~minimum-threshold]
+        (- x# minimum-threshold#)))
