@@ -38,13 +38,11 @@
     })
 
 (defprotocol Player
-    (will-jump [player common-knowledge common-cooperation])
-    (jump [player common-knowledge])
+    (will-move [player common-knowledge common-cooperation])
     (move [player common-knowledge]))
 
-
 (defrecord Random [id location will-to-live aggression cooperation decision] Player
-    (will-jump [player common-knowledge common-cooperation]
+    (will-move [player common-knowledge common-cooperation]
         (let 
             [fuzzy-cooperation 
                 (util/fuzzy-label cooperation-thresholds @(:cooperation player))
@@ -58,30 +56,25 @@
                 (util/desire min-common-cooperation common-cooperation)
              will-to-live-desire
                 (util/desire min-will-to-live @(:will-to-live player))]
+            (println "ID" (:id player))
+            (println "Fuzzy Cooperation:" fuzzy-cooperation)
+            (println "Fuzzy Aggression:" fuzzy-aggression)
+            (println "Cooperation desire:" cooperation-desire)
+            (println "Will to live desire:" will-to-live-desire)
+            (newline)
             (cond
                 (contains? common-knowledge (inc @(:location player))) 
                     [1.0 player]
                 (and (pos? cooperation-desire) (pos? will-to-live-desire))
                     [(+ cooperation-desire will-to-live-desire) player])))
 
-    (jump [player common-knowledge]
-        (if (not (empty? common-knowledge)) 
-            (first common-knowledge) 
-            (let [choice (rand-int 2)]
-                (reset! (:decision player) choice)
-                choice)))
-
     (move [player common-knowledge]
         (let [location @(:location player)
           knowledge-available (contains? common-knowledge (inc location))
-          will-jump (or knowledge-available (>= @(:will-to-live player) 0))
           next-step (if knowledge-available (get common-knowledge (inc location))
                                             (rand-int 2))]
-            (if will-jump 
-                (do
-                    (reset! (:decision player) next-step)
-                    next-step) 
-                nil))))
+            (reset! (:decision player) next-step)
+            (swap! (:location player) inc))))
 
 ;; Common Cooperation [0, 1]
 ;; Mean average of how many moves have been made so far.
@@ -94,33 +87,18 @@
 ;; 
 ;; Aggression [0, 1]
 ;; How "selfish" is the agent (primarily focussed on self-preservation)
+;; Could this be influenced by death/tick * proportion of unfortuante jumps
 ;; 
 ;; Will-to-live [0, 1]
 ;; How much certainty of death can the agent tolerate?
 ;; 
-;; This could probably be made more sophisticated.
-;; Chance of certain death [0, 1]
-;; ==> chance-of-death = (active-players - ticks-left) / active-players
-;; 
 ;; Min common-cooperation / Min will-to-live to jump
-;; C \ A |    VHi    |     Hi    |    Mid    |     Lo    |   VLo
-;; VHi   | 0.4 / 0.8 | 0.4 / 0.7 | 0.4 / 0.6 | 0.4 / 0.5 | 0.4 / 0.4
-;; Hi    | 0.5 / 0.8 | 0.5 / 0.7 | 0.5 / 0.6 | 0.5 / 0.5 | 0.5 / 0.4
-;; Mid   | 0.6 / 0.8 | 0.6 / 0.7 | 0.6 / 0.6 | 0.6 / 0.5 | 0.6 / 0.4
-;; Lo    | 0.7 / 0.8 | 0.7 / 0.7 | 0.7 / 0.6 | 0.7 / 0.5 | 0.7 / 0.4
-;; VLo   | 0.8 / 0.8 | 0.8 / 0.7 | 0.8 / 0.6 | 0.8 / 0.5 | 0.8 / 0.4
-
-;; (defn will-move [player cooperation aggression common-knowledge]
-;;     "Returns true if 
-;;         a)  Common knowledge for the correct next step is available
-;;         b)  Common cooperation and individual will to live meet the fuzzy thresholds
-;;             of (individual) cooperation and aggression.
-;;     else returns nil"
-;;     (let [next-step (inc @(:location player))
-;;           fuzzy-cooperation (fuzzy-label cooperation-thresholds @(:cooperation player))
-;;           fuzzy-aggression (fuzzy-label aggression-thresholds @(:aggression player))]
-;;         (when (or   (contains? common-knowledge next-step) 
-;;                     (jump-condition-met )) true)))
+;; C \ A     | VHi (1.0) | Hi (0.8)  | Mid (0.6) |  Lo (0.4) |  VLo (0.2)
+;; VHi (1.0) | 0.4 / 0.8 | 0.4 / 0.7 | 0.4 / 0.6 | 0.4 / 0.5 | 0.4 / 0.4
+;; Hi  (0.8) | 0.5 / 0.8 | 0.5 / 0.7 | 0.5 / 0.6 | 0.5 / 0.5 | 0.5 / 0.4
+;; Mid (0.6) | 0.6 / 0.8 | 0.6 / 0.7 | 0.6 / 0.6 | 0.6 / 0.5 | 0.6 / 0.4
+;; Lo  (0.4) | 0.7 / 0.8 | 0.7 / 0.7 | 0.7 / 0.6 | 0.7 / 0.5 | 0.7 / 0.4
+;; VLo (0.2) | 0.8 / 0.8 | 0.8 / 0.7 | 0.8 / 0.6 | 0.8 / 0.5 | 0.8 / 0.4
 
 ;; (defn perfect-jump [player _]
 ;;     "A brave player will jump to the next step."

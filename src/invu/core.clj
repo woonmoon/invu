@@ -14,8 +14,9 @@
           :common-knowledge {}
           :timer nil
           :tick 0 
-          :common-cooperation 0
-          :chance-of-death nil
+          :moves-made 0
+          :chance-of-death 0
+          :common-cooperation 0.5
           :tempered-steps {} 
         }))
 
@@ -45,17 +46,17 @@
         tributes (into (sorted-map) 
                     (remove nil?
                       (map 
-                        #(players/will-jump % (:common-knowledge state) (:common-cooperation state)) 
+                        #(players/will-move % (:common-knowledge state) (:common-cooperation state)) 
                         candidates)))]
     (if (or (empty? tributes) (seq (get-in state [:active-players 1])))
       state
       (let [chosen-one (second (first tributes))
-            player-move (players/jump chosen-one (:common-knowledge state))
-            disjoint-state (update-in state [:active-players 0] disj chosen-one)]
-        (swap! (:location chosen-one) inc)
-        (assoc-in disjoint-state [:active-players 1] #{chosen-one})))))
+            disjoint-state (update-in state [:active-players 0] disj chosen-one)
+            moved-state (assoc-in disjoint-state [:active-players 1] #{chosen-one})]
+        (players/move chosen-one (:common-knowledge state))
+        (update moved-state :moves-made inc)))))
 
-(defn next-step [location bridge]
+(defn next-step-available [location bridge]
   "Check if the next step of the bridge is occupied or not."
   (let [next-step (inc location)]
     (when (and (empty? (get @bridge next-step)) (<= next-step (count @bridge)))
@@ -64,15 +65,16 @@
 (defn maybe-move [state]
   (let [platform (get-in state [:active-players 0])
         bridge (atom (into (sorted-map-by >) (dissoc (:active-players state) 0)))
-        common-knowledge (:common-knowledge state)]
+        common-knowledge (:common-knowledge state)
+        common-cooperation (:common-cooperation state)]
     (doseq [[step players] @bridge]
       (when-let [player (first players)]
         ;; (println "PLAYER MOVING:" (:id player))
-        (when-let [next-step (next-step step bridge)]
+        (when-let [next-step (next-step-available step bridge)]
           ;; (println "NEXT STEP:" next-step)
-          (when-let [player-move (players/move player (:common-knowledge state))]
+          (when-let [player-move (players/will-move player common-knowledge common-cooperation)]
             ;; (println "PLAYER MOVE:" player-move)
-            (swap! (:location player) inc)
+            (players/move player common-knowledge)
             (swap! bridge update step disj player)
             (swap! bridge update next-step conj player)))))
     ;; (println "BRIDGE: " (into (sorted-map) @bridge))
@@ -92,6 +94,29 @@
   (swap! state update-in [:active-players (first (last (:tempered-steps @state)))] disj player)
   (swap! state update-in [:survivors] conj player))
 
+;; update-threshold = moves-made / ticks
+;; if update-threshold > 0.5:
+;;    common-cooperation = common-cooperation + 0.2 * (1 - common-cooperation)
+;; else:
+;;    common-cooperation = common-cooperation - 0.2 * common-cooperation
+(defn update-common-cooperation [state]
+  (let [update-threshold (util/safe-div (:moves-made state) (:tick state))]
+    (update state :common-cooperation #(util/reinforce-value % update-threshold 0.2 0.5))))
+
+;; Chance of certain death [0, 1]
+;; ==> chance-of-death = (active-players - ticks-left) / active-players
+;; if (active-players - ticks-left) = 0:
+;; ==> chance-of-death = 0
+(defn update-chance-of-death [state]
+  (let [time-left (- (:timer state) (:tick state))
+        num-active-players (util/count-active-players (:active-players state))
+        players-to-die (- num-active-players time-left)
+        new-chance-of-death 
+          (if (neg? players-to-die) 
+            0 
+            (util/safe-div players-to-die num-active-players))]
+    (assoc state :chance-of-death new-chance-of-death)))
+
 ; Nobody stepped forward
 ; Somebody stepped forward and died
 ; Somebody stepped forward and survived
@@ -108,10 +133,10 @@
         nil
         (if (= correct-step @(:decision leading-player))
           (if (= leading-step last-step)
-          (do
-            (survive state leading-player)
-            nil)
-          [leading-step correct-step])
+            (do
+              (survive state leading-player)
+              nil)
+            [leading-step correct-step])
           (do
             (kill state leading-step leading-player)
             [leading-step (util/other-direction @(:decision leading-player))])))))
@@ -119,13 +144,15 @@
 (defn end-of-tick [state]
   (when-let [[step knowledge] (find-correct-step state)]
     (swap! state assoc-in [:common-knowledge step] knowledge)
-    (swap! state update :common-knowledge #(into (sorted-map) %))))
+    (swap! state update :common-knowledge #(into (sorted-map) %)))
+  (swap! state update-common-cooperation)
+  (swap! state update-chance-of-death))
 
 (defn tick [state]
+  (swap! state update :tick inc)
   (swap! state maybe-move)
   (swap! state maybe-jump)
-  (end-of-tick state)
-  (swap! state update :tick inc))
+  (end-of-tick state))
 
 (defn start-simulation [state]
   (while (and (< (:tick @state) (:timer @state))
@@ -137,5 +164,6 @@
   (init-state new-state 5 10)
   (spawn-players new-state 3)
   (log/log-state new-state)
+  (log/log-active-players new-state)
   (start-simulation new-state)
   (shutdown-agents))

@@ -10,6 +10,21 @@
         (doseq [[step players] bridge]
             (log-step step players))))
 
+(defn log-player [player]
+    (println
+        (:id player) ":"
+        "will-to-live:" (format "%.3f" @(:will-to-live player)) 
+        "aggression:" (format "%.3f" @(:aggression player)) 
+        "cooperation:" (format "%.3f" @(:cooperation player))))
+
+(defn log-active-players [state]
+    (println "Active players at tick" (:tick @state))
+    (let [active-players (:active-players @state)]
+        (doseq [[step players] active-players
+                player players]
+            (log-player player)))
+    (newline))
+
 (defn log-state [state] 
     (println "Tick:" (:tick @state))
     (println "Active Players:" (count (apply set/union (vals (:active-players @state)))))
@@ -23,5 +38,8 @@
         (print (into [] (map #(:id %) (:survivors @state))))
         (newline))
     (println "Tempered Steps:" (:tempered-steps @state))
-    (println "Common Knowledge: " (:common-knowledge @state))
+    (println "Common Knowledge:" (:common-knowledge @state))
+    (println "Common Cooperation:" (:common-cooperation @state))
+    (println "Moves Made:" (:moves-made @state))
+    (println "Chance of Death:" (:chance-of-death @state))
     (newline))

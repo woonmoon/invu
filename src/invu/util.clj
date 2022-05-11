@@ -23,6 +23,10 @@
     "Generates number between lower-bound (inclusive) and upwards by offset (exclusive)"
     (rand-range lower-bound (+ lower-bound offset)))
 
+(defn count-active-players [active-players]
+    "Returns number of active players when given a mapping of step to player hashmap"
+    (reduce + (map count (vals active-players))))
+
 (defmacro fuzzy-label [thresholds x]
     "Returns correct fuzzy label given thresholds and score x."
     `(let [ x# ~x
@@ -36,3 +40,20 @@
     `(let [x# ~x
             minimum-threshold# ~minimum-threshold]
         (- x# minimum-threshold#)))
+
+(defmacro safe-div [x y]
+    "Returns x/y if the divisor is 0 returns 1 (used for updating state thresholds)"
+    `(let [x# ~x
+            y# ~y]
+            (if (zero? y#)
+                1
+                (/ x# y#))))
+
+(defmacro reinforce-value [value indicator learning-rate threshold]
+    `(let [value# ~value
+            indicator# ~indicator
+            rate# ~learning-rate
+            threshold# ~threshold]
+        (if (< threshold# indicator#)
+            (+ value# (* rate# (- 1 value#)))
+            (- value# (* rate# value#)))))
