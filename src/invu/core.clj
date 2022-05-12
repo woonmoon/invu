@@ -46,7 +46,7 @@
         tributes (into (sorted-map) 
                     (remove nil?
                       (map 
-                        #(players/will-move % (:common-knowledge state) (:common-cooperation state)) 
+                        #(players/will-move % (:common-knowledge state) (:common-cooperation state) true) 
                         candidates)))]
     (if (or (empty? tributes) (seq (get-in state [:active-players 1])))
       state
@@ -72,7 +72,7 @@
         ;; (println "PLAYER MOVING:" (:id player))
         (when-let [next-step (next-step-available step bridge)]
           ;; (println "NEXT STEP:" next-step)
-          (when-let [player-move (players/will-move player common-knowledge common-cooperation)]
+          (when-let [player-move (players/will-move player common-knowledge common-cooperation true)]
             ;; (println "PLAYER MOVE:" player-move)
             (players/move player common-knowledge)
             (swap! bridge update step disj player)
@@ -158,12 +158,13 @@
   (while (and (< (:tick @state) (:timer @state))
               (not (empty? (apply set/union (vals (:active-players @state))))))
     (tick new-state)
-    (log/log-state new-state)))
+    ;; (log/log-state new-state)
+    ))
 
 (defn -main []
-  (init-state new-state 5 10)
+  (init-state new-state 5 1)
   (spawn-players new-state 3)
-  (log/log-state new-state)
-  (log/log-active-players new-state)
+  ;; (log/log-state new-state)
+  ;; (log/log-active-players new-state)
   (start-simulation new-state)
   (shutdown-agents))

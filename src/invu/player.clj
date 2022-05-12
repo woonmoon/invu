@@ -38,11 +38,11 @@
     })
 
 (defprotocol Player
-    (will-move [player common-knowledge common-cooperation])
+    (will-move [player common-knowledge common-cooperation log?])
     (move [player common-knowledge]))
 
 (defrecord Random [id location will-to-live aggression cooperation decision] Player
-    (will-move [player common-knowledge common-cooperation]
+    (will-move [player common-knowledge common-cooperation log?]
         (let 
             [fuzzy-cooperation 
                 (util/fuzzy-label cooperation-thresholds @(:cooperation player))
@@ -56,12 +56,20 @@
                 (util/desire min-common-cooperation common-cooperation)
              will-to-live-desire
                 (util/desire min-will-to-live @(:will-to-live player))]
-            (println "ID" (:id player))
-            (println "Fuzzy Cooperation:" fuzzy-cooperation)
-            (println "Fuzzy Aggression:" fuzzy-aggression)
-            (println "Cooperation desire:" cooperation-desire)
-            (println "Will to live desire:" will-to-live-desire)
-            (newline)
+            (when log?
+                (let [will-jump 
+                        (or (contains? common-knowledge (inc @(:location player))) 
+                            (and (pos? cooperation-desire) (pos? will-to-live-desire)))]
+                    (println
+                        (:id player) 
+                        @(:cooperation player)
+                        @(:aggression player)
+                        @(:will-to-live player)
+                        fuzzy-cooperation
+                        fuzzy-aggression
+                        cooperation-desire
+                        will-to-live-desire
+                        will-jump)))
             (cond
                 (contains? common-knowledge (inc @(:location player))) 
                     [1.0 player]
