@@ -46,42 +46,43 @@ def verifyClassification(player, _attr):
     fuzzy_attribute = getattr(player, "Fuzzy"+_attr)
     assert(0.0 <= attribute < 1.0)
     if 0 <= attribute < 0.2:
-        assert(FuzzyLabel.VLO == fuzzy_attribute)
+        return FuzzyLabel.VLO == fuzzy_attribute
     elif 0.2 <= attribute < 0.4:
-        assert(FuzzyLabel.LO == fuzzy_attribute)
+        return FuzzyLabel.LO == fuzzy_attribute
     elif 0.4 <= attribute < 0.6:
-        assert(FuzzyLabel.MID == fuzzy_attribute)
+        return FuzzyLabel.MID == fuzzy_attribute
     elif 0.6 <= attribute < 0.8:
-        assert(FuzzyLabel.HI == fuzzy_attribute)
+        return FuzzyLabel.HI == fuzzy_attribute
     else:
-        assert(FuzzyLabel.VHI == fuzzy_attribute)
+        return FuzzyLabel.VHI == fuzzy_attribute
 
 
-def verifyCooperationDesire(player):
+def verifyCooperationDesire(player, common_cooperation):
     min_cooperation = min_cooperation_lookup[player.FuzzyCooperation]
-    print("Cooperation: ", player.Cooperation)
-    print("Min Cooperation: ", min_cooperation)
-    print("Copperation desire: ", player.CooperationDesire)
-    assert(player.Cooperation - min_cooperation == player.CooperationDesire)
+    # print("Cooperation: ", player.Cooperation)
+    # print("Min Cooperation: ", min_cooperation)
+    # print("Copperation desire: ", player.CooperationDesire)
+    return (common_cooperation - min_cooperation == player.CooperationDesire)
 
 
 def verifyWTLDesire(player):
     min_will_to_live = min_will_to_live_lookup[player.FuzzyAggression]
-    assert(player.WillToLive - min_will_to_live == player.WTLDesire)
+    return (player.WillToLive - min_will_to_live == player.WTLDesire)
 
 
 def verifyJump(player, player_to_jump):
-    if player.CooperationDesire > 0 and player.WTLDesire > 0:
-        assert(player_to_jump[player.ID])
+    should_jump = player.CooperationDesire > 0 and player.WTLDesire > 0
+    return should_jump == player_to_jump[player.ID]
 
 
 def main(argv):
     players = []
+    common_cooperation = None
     player_to_jump = {}
     with open(argv, 'r') as testfile:
         for line in testfile:
             fields = line.split()
-            assert(len(fields) == 9)
+            assert(len(fields) == 10)
             _id = fields[0]
             _cooperation = float(fields[1])
             _aggression = float(fields[2])
@@ -90,7 +91,8 @@ def main(argv):
             _fuzz_aggr = FuzzyLabel(fields[5])
             _coop_desire = float(fields[6])
             _wtl_desire = float(fields[7])
-            jumped = fields[8]
+            common_coop = float(fields[8])
+            jumped = fields[9]
             player = PlayerInfo(
                 _id, 
                 _cooperation, 
@@ -103,13 +105,22 @@ def main(argv):
             )
             players.append(player)
             player_to_jump[_id] = jumped
+            common_cooperation = common_coop
 
+    all_players_pass = True
     for player in players:
-        verifyClassification(player, "Cooperation")
-        verifyClassification(player, "Aggression")
-        verifyCooperationDesire(player)
-        verifyWTLDesire(player)
-
+        all_players_pass = (
+            all_players_pass and
+            verifyClassification(player, "Cooperation") and 
+            verifyClassification(player, "Aggression") and
+            verifyCooperationDesire(player, common_cooperation) and
+            verifyWTLDesire(player)
+        )
+    
+    return all_players_pass
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    if main(sys.argv[1]) == True:
+        sys.exit(0)
+    else:
+        sys.exit(1)

@@ -69,6 +69,7 @@
                         fuzzy-aggression
                         cooperation-desire
                         will-to-live-desire
+                        common-cooperation
                         will-jump)))
             (cond
                 (contains? common-knowledge (inc @(:location player))) 
