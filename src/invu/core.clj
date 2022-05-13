@@ -16,7 +16,7 @@
           :tick 0 
           :moves-made 0
           :chance-of-death 0
-          :common-cooperation 0.5
+          :common-cooperation 0.75
           :tempered-steps {} 
         }))
 

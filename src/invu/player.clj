@@ -30,11 +30,11 @@
 
 (defonce aggression-to-min-will-to-live
     {
-        :VLO    0.4
-        :LO     0.5
-        :MID    0.6
-        :HI     0.7
-        :VHI    0.8
+        :VLO    0.1
+        :LO     0.2
+        :MID    0.3
+        :HI     0.4
+        :VHI    0.5
     })
 
 (defprotocol Player

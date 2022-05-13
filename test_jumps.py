@@ -33,11 +33,11 @@ min_cooperation_lookup = {
 }
 
 min_will_to_live_lookup = {
-    FuzzyLabel.VLO: 0.4,
-    FuzzyLabel.LO: 0.5,
-    FuzzyLabel.MID: 0.6,
-    FuzzyLabel.HI: 0.7,
-    FuzzyLabel.VHI: 0.8 
+    FuzzyLabel.VLO: 0.1,
+    FuzzyLabel.LO: 0.2,
+    FuzzyLabel.MID: 0.3,
+    FuzzyLabel.HI: 0.4,
+    FuzzyLabel.VHI: 0.5 
 }
 
 
@@ -59,9 +59,6 @@ def verifyClassification(player, _attr):
 
 def verifyCooperationDesire(player, common_cooperation):
     min_cooperation = min_cooperation_lookup[player.FuzzyCooperation]
-    # print("Cooperation: ", player.Cooperation)
-    # print("Min Cooperation: ", min_cooperation)
-    # print("Copperation desire: ", player.CooperationDesire)
     return (common_cooperation - min_cooperation == player.CooperationDesire)
 
 
@@ -92,7 +89,7 @@ def main(argv):
             _coop_desire = float(fields[6])
             _wtl_desire = float(fields[7])
             common_coop = float(fields[8])
-            jumped = fields[9]
+            jumped = ast.literal_eval(fields[9].title())
             player = PlayerInfo(
                 _id, 
                 _cooperation, 
@@ -107,20 +104,13 @@ def main(argv):
             player_to_jump[_id] = jumped
             common_cooperation = common_coop
 
-    all_players_pass = True
     for player in players:
-        all_players_pass = (
-            all_players_pass and
-            verifyClassification(player, "Cooperation") and 
-            verifyClassification(player, "Aggression") and
-            verifyCooperationDesire(player, common_cooperation) and
-            verifyWTLDesire(player)
-        )
+        assert(verifyClassification(player, "Cooperation"))
+        assert(verifyClassification(player, "Aggression"))
+        assert(verifyCooperationDesire(player, common_cooperation))
+        assert(verifyWTLDesire(player))
+        assert(verifyJump(player, player_to_jump))
     
-    return all_players_pass
 
 if __name__ == "__main__":
-    if main(sys.argv[1]) == True:
-        sys.exit(0)
-    else:
-        sys.exit(1)
+    main(sys.argv[1])
