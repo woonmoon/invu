@@ -1,45 +1,44 @@
 (ns invu.logger
     (:require [clojure.set :as set])
-    (:require [invu.util :as util]))
+    (:require [invu.util :as util])
+    (:require [clojure.java.io :as io]))
 
-(defn log-step [step players]
-    (print "{" step ":" (into [] (map #(:id %) players)) "} "))
+(defprotocol Logger
+    (init-writer [this name])
+    (log [this message]))
 
-(defn log-bridge [state]
-    (let [bridge (into (sorted-map) (dissoc (:active-players @state) 0))]
-        (doseq [[step players] bridge]
-            (log-step step players))))
+(defrecord StateLogger [] Logger
+    (init-writer [_ name]
+        (io/writer name))
 
-(defn log-player [player]
-    (println
-        (:id player) ":"
-        "will-to-live:" (format "%.3f" @(:will-to-live player)) 
-        "aggression:" (format "%.3f" @(:aggression player)) 
-        "cooperation:" (format "%.3f" @(:cooperation player))))
+    (log [_ state]
+        (with-open [wrtr (io/writer "log-state.txt" :append true)]
+            (.write wrtr (util/fmtln "Tick:" (:tick @state)))
+            (.write wrtr (util/fmtln "Active Players:" (count (apply set/union (vals (:active-players @state))))))
+            (.write wrtr (util/fmtln "Bridge:")) 
+            (let [bridge (into (sorted-map) (dissoc (:active-players @state) 0))]
+                (doseq [[step players] bridge]
+                    (.write wrtr (util/fmt "{" step ":" (into [] (map #(:id %) players)) "} "))))
+            (.write wrtr (util/fmtln "Dead Players:" (count (:dead-players @state))))
+            (.write wrtr (util/fmtln "Survivors:" (count (:survivors @state))))
+            (.write wrtr (util/fmtln (into [] (map #(:id %) (:survivors @state)))))
+            (.write wrtr (util/fmtln "Tempered Steps:" (:tempered-steps @state)))
+            (.write wrtr (util/fmtln "Common Knowledge:" (:common-knowledge @state)))
+            (.write wrtr (util/fmtln "Common Cooperation:" (:common-cooperation @state)))
+            (.write wrtr (util/fmtln "Moves Made:" (:moves-made @state)))
+            (.write wrtr (util/fmtln "Chance of Death:" (:chance-of-death @state))))))
 
-(defn log-active-players [state]
-    (println "Active players at tick" (:tick @state))
-    (let [active-players (:active-players @state)]
-        (doseq [[step players] active-players
-                player players]
-            (log-player player)))
-    (newline))
+;; (defn log-player [player]
+;;     (println
+;;         (:id player) ":"
+;;         "will-to-live:" (format "%.3f" @(:will-to-live player)) 
+;;         "aggression:" (format "%.3f" @(:aggression player)) 
+;;         "cooperation:" (format "%.3f" @(:cooperation player))))
 
-(defn log-state [state] 
-    (println "Tick:" (:tick @state))
-    (println "Active Players:" (count (apply set/union (vals (:active-players @state)))))
-    (do
-        (print "Bridge:") 
-        (log-bridge state)
-        (newline))
-    (println "Dead Players:" (count (:dead-players @state)))
-    (println "Survivors:" (count (:survivors @state)))
-    (do
-        (print (into [] (map #(:id %) (:survivors @state))))
-        (newline))
-    (println "Tempered Steps:" (:tempered-steps @state))
-    (println "Common Knowledge:" (:common-knowledge @state))
-    (println "Common Cooperation:" (:common-cooperation @state))
-    (println "Moves Made:" (:moves-made @state))
-    (println "Chance of Death:" (:chance-of-death @state))
-    (newline))
+;; (defn log-active-players [state]
+;;     (println "Active players at tick" (:tick @state))
+;;     (let [active-players (:active-players @state)]
+;;         (doseq [[step players] active-players
+;;                 player players]
+;;             (log-player player)))
+;;     (newline))
