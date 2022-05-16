@@ -32,6 +32,26 @@
         (.write wrtr (fmtln "Chance of Death:" (:chance-of-death @state)))
         (.write wrtr endl)))
 
+(defmethod log :log-player [_ state]
+    (with-open [wrtr (io/writer "log-players.txt" :append true)]
+        (let [active-players (:active-players @state)]
+            (doseq [[step players] active-players
+                    player players]
+                (.write wrtr
+                    (fmtln
+                        (:id player) ":"
+                        "will-to-live:" (format "%.3f" @(:will-to-live player)) 
+                        "aggression:" (format "%.3f" @(:aggression player)) 
+                        "cooperation:" (format "%.3f" @(:cooperation player))))))
+        (doseq [player (:dead-players @state)]
+            (.write wrtr
+                (fmtln
+                    (:id player) ":"
+                    "will-to-live:" (format "%.3f" @(:will-to-live player)) 
+                    "aggression:" (format "%.3f" @(:aggression player)) 
+                    "cooperation:" (format "%.3f" @(:cooperation player)))))
+        (.write wrtr endl)))
+
 (defmethod log :test-jump 
     [_ player fuzzy-coop fuzzy-aggr coop-desire wtl-desire common-coop will-jump]
         (with-open [wrtr (io/writer "test-jump.txt" :append true)]
@@ -47,19 +67,3 @@
                 wtl-desire
                 common-coop
                 will-jump))))
-
-
-;; (defn log-player [player]
-;;     (println
-;;         (:id player) ":"
-;;         "will-to-live:" (format "%.3f" @(:will-to-live player)) 
-;;         "aggression:" (format "%.3f" @(:aggression player)) 
-;;         "cooperation:" (format "%.3f" @(:cooperation player))))
-
-;; (defn log-active-players [state]
-;;     (println "Active players at tick" (:tick @state))
-;;     (let [active-players (:active-players @state)]
-;;         (doseq [[step players] active-players
-;;                 player players]
-;;             (log-player player)))
-;;     (newline))

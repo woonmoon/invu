@@ -37,7 +37,13 @@
   (let [players 
           (into #{}
             (repeatedly num-players 
-              #(players/->Random (gensym "Player") (atom 0) (atom (rand)) (atom (rand)) (atom (rand)) (atom nil))))]
+              #(players/->Random 
+                  (gensym "Player") 
+                  (atom 0) 
+                  (atom (rand)) 
+                  (atom (rand))
+                  (atom (rand)) 
+                  (atom nil))))]
     (swap! state assoc-in [:active-players 0] players)))
 
 (defn maybe-jump [state]
@@ -117,32 +123,35 @@
             (util/safe-div players-to-die num-active-players))]
     (assoc state :chance-of-death new-chance-of-death)))
 
+(defn end-of-bridge [state player]
+  (let [[last-step correct-last-step] (first (last (:tempered-steps)))]
+    (if (= @(:decision player) correct-last-step)
+      (survive state player)
+      (kill state last-step player))))
+
+(defn no-knowledge-to-update [state leading-step]
+  (or (contains? (:common-knowledge @state) leading-step) 
+      (= 0 leading-step)))
+
 ; Nobody stepped forward
 ; Somebody stepped forward and died
 ; Somebody stepped forward and survived
 ; Somebody made it to the end of the bridge
 ;; Fix this.
-(defn find-correct-step [state]
-  (let [last-step (first (last (:tempered-steps @state)))
-        leading-step (find-leading-step (into (sorted-map) (:active-players @state)))
+(defn new-knowledge-to-update [state]
+  (let [leading-step (find-leading-step (into (sorted-map) (:active-players @state)))
         leading-player (first (get-in @state [:active-players leading-step]))
         correct-step (get-in @state [:tempered-steps leading-step])
         common-knowledge (:common-knowledge @state)]
-      ; (println "LEADING STEP:" leading-step "LAST STEP:" last-step "LEADING PLAYER:" (:id leading-player) "CORRECT STEP:" correct-step "PLAYER CHOICE:" @(:decision leading-player))
-      (if (or (= 0 leading-step) (and (contains? common-knowledge leading-step) (not= leading-step last-step)))
-        nil
-        (if (= correct-step @(:decision leading-player))
-          (if (= leading-step last-step)
-            (do
-              (survive state leading-player)
-              nil)
-            [leading-step correct-step])
-          (do
-            (kill state leading-step leading-player)
-            [leading-step (util/other-direction @(:decision leading-player))])))))
+    (when (not (no-knowledge-to-update state leading-step))
+      (if (= leading-step (first (last (:tempered-steps @state))))
+        (end-of-bridge state leading-player)
+        (when (not= correct-step @(:decision leading-player))
+          (kill state leading-step leading-player))))
+    [leading-step correct-step]))
 
 (defn end-of-tick [state]
-  (when-let [[step knowledge] (find-correct-step state)]
+  (when-let [[step knowledge] (new-knowledge-to-update state)]
     (swap! state assoc-in [:common-knowledge step] knowledge)
     (swap! state update :common-knowledge #(into (sorted-map) %)))
   (swap! state update-common-cooperation)
@@ -158,14 +167,12 @@
   (while (and (< (:tick @state) (:timer @state))
               (not (empty? (apply set/union (vals (:active-players @state))))))
     (tick new-state)
-    ;; (log/log-state new-state)
-    ))
+    (log/log :log-state new-state)))
 
 (defn -main [& args]
   (init-state new-state 5 1)
   (spawn-players new-state 3)
   (log/log :log-state new-state)
-  ;; ;; (log/log-active-players new-state)
-  ;; (start-simulation new-state)
+  (start-simulation new-state)
   ;; (shutdown-agents)
   )

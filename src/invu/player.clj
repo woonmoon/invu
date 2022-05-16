@@ -1,5 +1,7 @@
 (ns invu.player
-    (:require [invu.util :as util]))
+    (:require 
+        [invu.util :as util]
+        [invu.logger :as log]))
 
 (defonce cooperation-thresholds
     {
@@ -55,22 +57,20 @@
              cooperation-desire 
                 (util/desire min-common-cooperation common-cooperation)
              will-to-live-desire
-                (util/desire min-will-to-live @(:will-to-live player))]
+                (util/desire min-will-to-live @(:will-to-live player))
+             will-jump
+                (or (contains? common-knowledge (inc @(:location player))) 
+                    (and (pos? cooperation-desire) (pos? will-to-live-desire)))]
+            ;; Tragic, but not the top of my problems.
             (when log?
-                (let [will-jump 
-                        (or (contains? common-knowledge (inc @(:location player))) 
-                            (and (pos? cooperation-desire) (pos? will-to-live-desire)))]
-                    (println
-                        (:id player) 
-                        @(:cooperation player)
-                        @(:aggression player)
-                        @(:will-to-live player)
-                        fuzzy-cooperation
-                        fuzzy-aggression
-                        cooperation-desire
-                        will-to-live-desire
-                        common-cooperation
-                        will-jump)))
+                (log/log :test-jump
+                    player
+                    fuzzy-cooperation
+                    fuzzy-aggression
+                    cooperation-desire
+                    will-to-live-desire
+                    common-cooperation
+                    will-jump))
             (cond
                 (contains? common-knowledge (inc @(:location player))) 
                     [1.0 player]
@@ -109,18 +109,3 @@
 ;; Lo  (0.4) | 0.7 / 0.8 | 0.7 / 0.7 | 0.7 / 0.6 | 0.7 / 0.5 | 0.7 / 0.4
 ;; VLo (0.2) | 0.8 / 0.8 | 0.8 / 0.7 | 0.8 / 0.6 | 0.8 / 0.5 | 0.8 / 0.4
 
-;; (defn perfect-jump [player _]
-;;     "A brave player will jump to the next step."
-;;     (reset! (:decision player) 0)
-;;     0)
-
-;; (defn perfect-move [player common-knowledge]
-;;     "A small step for one player, one giant leap for playerkind.
-;;     Players should follow common knowledge if available.
-;;     If will-to-live > 5, will move to a random direction.
-;;     Returns true if player moved else false."
-;;     (let [location @(:location player)
-;;           next-step (get common-knowledge (inc location))]
-;;         (println "AT LOCATION " location " NEXT STEP IS " next-step)
-;;         (reset! (:decision player) next-step)
-;;         next-step))
