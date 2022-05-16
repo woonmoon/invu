@@ -3,7 +3,6 @@
   (:require [clojure.set :as set]
             [invu.util :as util]
             [invu.player :as players]
-            [invu.domain :as domain]
             [invu.logger :as log]
             [clojure.java.io :as io])
   (:gen-class))
@@ -20,8 +19,6 @@
           :common-cooperation 0.75
           :tempered-steps {} 
         }))
-
-(defonce state-logger (log/->StateLogger))
 
 (defn init-state [state num-steps num-ticks]
   (let [num-entries (inc num-steps)
@@ -167,8 +164,7 @@
 (defn -main [& args]
   (init-state new-state 5 1)
   (spawn-players new-state 3)
-  (log/init-writer state-logger "log-state.txt")
-  (log/log state-logger new-state)
+  (log/log :log-state new-state)
   ;; ;; (log/log-active-players new-state)
   ;; (start-simulation new-state)
   ;; (shutdown-agents)

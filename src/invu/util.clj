@@ -1,6 +1,5 @@
 (ns invu.util
-    (:require [clojure.set :as set])
-    (:require [clojure.string :as string]))
+    (:require [clojure.set :as set]))
 
 (defn other-direction [direction]
     (if (zero? direction) 1 0))
@@ -27,12 +26,6 @@
 (defn count-active-players [active-players]
     "Returns number of active players when given a mapping of step to player hashmap"
     (reduce + (map count (vals active-players))))
-
-(defn fmt [& args]
-    (string/join " " args))
-
-(defn fmtln [& args]
-    (str (string/join " " args) "\n"))
 
 (defmacro fuzzy-label [thresholds x]
     "Returns correct fuzzy label given thresholds and score x."
