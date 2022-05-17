@@ -52,7 +52,7 @@
         tributes (into (sorted-map) 
                     (remove nil?
                       (map 
-                        #(players/will-move % (:common-knowledge state) (:common-cooperation state) true) 
+                        #(players/will-move % (:common-knowledge state) (:common-cooperation state)) 
                         candidates)))]
     (if (or (empty? tributes) (seq (get-in state [:active-players 1])))
       state
@@ -75,19 +75,14 @@
         common-cooperation (:common-cooperation state)]
     (doseq [[step players] @bridge]
       (when-let [player (first players)]
-        ;; (println "PLAYER MOVING:" (:id player))
         (when-let [next-step (next-step-available step bridge)]
-          ;; (println "NEXT STEP:" next-step)
-          (when-let [player-move (players/will-move player common-knowledge common-cooperation true)]
-            ;; (println "PLAYER MOVE:" player-move)
+          (when-let [player-move (players/will-move player common-knowledge common-cooperation)]
             (players/move player common-knowledge)
             (swap! bridge update step disj player)
             (swap! bridge update next-step conj player)))))
-    ;; (println "BRIDGE: " (into (sorted-map) @bridge))
     (assoc state :active-players (merge {0 platform} (into (sorted-map) @bridge)))))
 
 (defn find-leading-step [active-players]
-  ; (println "ACTIVE PLAYERS: " active-players)
   (first 
     (first 
       (filter #(not (empty? (second %))) (reverse active-players)))))
@@ -105,45 +100,48 @@
 ;;    common-cooperation = common-cooperation + 0.2 * (1 - common-cooperation)
 ;; else:
 ;;    common-cooperation = common-cooperation - 0.2 * common-cooperation
-(defn update-common-cooperation [state]
-  (let [update-threshold (util/safe-div (:moves-made state) (:tick state))]
-    (update state :common-cooperation #(util/reinforce-value % update-threshold 0.2 0.5))))
+(defn delta-common-cooperation [state]
+  (let [old-common-coop (:common-cooperation @state)
+        update-threshold (util/safe-div (:moves-made @state) (:tick @state))
+        new-common-coop (util/reinforce-value old-common-coop update-threshold 0.2 0.5)]
+    (swap! state assoc :common-cooperation new-common-coop)
+    (- old-common-coop new-common-coop)))
 
 ;; Chance of certain death [0, 1]
 ;; ==> chance-of-death = (active-players - ticks-left) / active-players
 ;; if (active-players - ticks-left) = 0:
 ;; ==> chance-of-death = 0
-(defn update-chance-of-death [state]
-  (let [time-left (- (:timer state) (:tick state))
-        num-active-players (util/count-active-players (:active-players state))
+(defn delta-chance-of-death [state]
+  (let [old-chance-of-death (:chance-of-death @state)
+        time-left (- (:timer @state) (:tick @state))
+        num-active-players (util/count-active-players (:active-players @state))
         players-to-die (- num-active-players time-left)
         new-chance-of-death 
           (if (neg? players-to-die) 
             0 
             (util/safe-div players-to-die num-active-players))]
-    (assoc state :chance-of-death new-chance-of-death)))
+    (swap! state assoc :chance-of-death new-chance-of-death)
+    (- old-chance-of-death new-chance-of-death)))
 
 (defn end-of-bridge [state player]
-  (let [[last-step correct-last-step] (first (last (:tempered-steps)))]
+  (let [[last-step correct-last-step] (first (last (:tempered-steps @state)))]
     (if (= @(:decision player) correct-last-step)
       (survive state player)
       (kill state last-step player))))
 
-(defn no-knowledge-to-update [state leading-step]
+(defn no-new-knowledge [state leading-step]
   (or (contains? (:common-knowledge @state) leading-step) 
       (= 0 leading-step)))
 
-; Nobody stepped forward
-; Somebody stepped forward and died
-; Somebody stepped forward and survived
-; Somebody made it to the end of the bridge
-;; Fix this.
-(defn new-knowledge-to-update [state]
+(defn new-knowledge [state]
   (let [leading-step (find-leading-step (into (sorted-map) (:active-players @state)))
         leading-player (first (get-in @state [:active-players leading-step]))
         correct-step (get-in @state [:tempered-steps leading-step])
         common-knowledge (:common-knowledge @state)]
-    (when (not (no-knowledge-to-update state leading-step))
+    ;; (println "leading-step" leading-step)
+    ;; (println "leading-player" (:id leading-player))
+    ;; (println "correct-step" correct-step)
+    (when (not (no-new-knowledge state leading-step))
       (if (= leading-step (first (last (:tempered-steps @state))))
         (end-of-bridge state leading-player)
         (when (not= correct-step @(:decision leading-player))
@@ -151,28 +149,30 @@
     [leading-step correct-step]))
 
 (defn end-of-tick [state]
-  (when-let [[step knowledge] (new-knowledge-to-update state)]
+  (when-let [[step knowledge] (new-knowledge state)]
     (swap! state assoc-in [:common-knowledge step] knowledge)
     (swap! state update :common-knowledge #(into (sorted-map) %)))
-  (swap! state update-common-cooperation)
-  (swap! state update-chance-of-death))
+  (let [active-players (apply set/union (vals (:active-players @state)))
+        delta-common-cooperation (delta-common-cooperation state)
+        delta-chance-of-death (delta-chance-of-death state)]
+    (map #(players/update-cooperation % delta-common-cooperation) active-players)))
 
 (defn tick [state]
   (swap! state update :tick inc)
   (swap! state maybe-move)
   (swap! state maybe-jump)
-  (end-of-tick state))
+  (end-of-tick state)
+  (log/log :log-state state)
+  (log/log :log-players state))
 
 (defn start-simulation [state]
   (while (and (< (:tick @state) (:timer @state))
               (not (empty? (apply set/union (vals (:active-players @state))))))
-    (tick new-state)
-    (log/log :log-state new-state)))
+    (tick new-state)))
 
 (defn -main [& args]
-  (init-state new-state 5 1)
+  (init-state new-state 5 10)
   (spawn-players new-state 3)
   (log/log :log-state new-state)
   (start-simulation new-state)
-  ;; (shutdown-agents)
-  )
+  (shutdown-agents))

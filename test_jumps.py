@@ -14,7 +14,7 @@ class FuzzyLabel(Enum):
     VLO = ":VLO"
 
 @dataclass
-class PlayerInfo:
+class TestInfo:
     ID: str
     Cooperation: float
     Aggression: float
@@ -23,6 +23,8 @@ class PlayerInfo:
     FuzzyAggression: FuzzyLabel
     CooperationDesire: float
     WTLDesire: float
+    Jumped: bool
+    CommonCooperation: float
 
 min_cooperation_lookup = {
     FuzzyLabel.VLO: 0.8,
@@ -57,25 +59,24 @@ def verifyClassification(player, _attr):
         return FuzzyLabel.VHI == fuzzy_attribute
 
 
-def verifyCooperationDesire(player, common_cooperation):
-    min_cooperation = min_cooperation_lookup[player.FuzzyCooperation]
-    return (common_cooperation - min_cooperation == player.CooperationDesire)
+def verifyCooperationDesire(test):
+    min_cooperation = min_cooperation_lookup[test.FuzzyCooperation]
+    return (test.CommonCooperation - min_cooperation == test.CooperationDesire)
 
 
-def verifyWTLDesire(player):
-    min_will_to_live = min_will_to_live_lookup[player.FuzzyAggression]
-    return (player.WillToLive - min_will_to_live == player.WTLDesire)
+def verifyWTLDesire(test):
+    min_will_to_live = min_will_to_live_lookup[test.FuzzyAggression]
+    return (test.WillToLive - min_will_to_live == test.WTLDesire)
 
 
-def verifyJump(player, player_to_jump):
-    should_jump = player.CooperationDesire > 0 and player.WTLDesire > 0
-    return should_jump == player_to_jump[player.ID]
+def verifyJump(test):
+    should_jump = test.CooperationDesire > 0 and test.WTLDesire > 0
+    return should_jump == test.Jumped
 
 
 def main(argv):
-    players = []
+    tests = []
     common_cooperation = None
-    player_to_jump = {}
     with open(argv, 'r') as testfile:
         for line in testfile:
             fields = line.split()
@@ -88,9 +89,9 @@ def main(argv):
             _fuzz_aggr = FuzzyLabel(fields[5])
             _coop_desire = float(fields[6])
             _wtl_desire = float(fields[7])
-            common_coop = float(fields[8])
-            jumped = ast.literal_eval(fields[9].title())
-            player = PlayerInfo(
+            _common_coop = float(fields[8])
+            _jumped = ast.literal_eval(fields[9].title())
+            test = TestInfo(
                 _id, 
                 _cooperation, 
                 _aggression, 
@@ -98,18 +99,18 @@ def main(argv):
                 _fuzz_coop, 
                 _fuzz_aggr, 
                 _coop_desire, 
-                _wtl_desire
+                _wtl_desire,
+                _jumped,
+                _common_coop
             )
-            players.append(player)
-            player_to_jump[_id] = jumped
-            common_cooperation = common_coop
+            tests.append(test)
 
-    for player in players:
-        assert(verifyClassification(player, "Cooperation"))
-        assert(verifyClassification(player, "Aggression"))
-        assert(verifyCooperationDesire(player, common_cooperation))
-        assert(verifyWTLDesire(player))
-        assert(verifyJump(player, player_to_jump))
+    for test in tests:
+        assert(verifyClassification(test, "Cooperation"))
+        assert(verifyClassification(test, "Aggression"))
+        assert(verifyCooperationDesire(test))
+        assert(verifyWTLDesire(test))
+        assert(verifyJump(test))
     
 
 if __name__ == "__main__":

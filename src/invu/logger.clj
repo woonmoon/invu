@@ -1,7 +1,8 @@
 (ns invu.logger
-    (:require [clojure.set :as set])
-    (:require [clojure.string :as string])
-    (:require [clojure.java.io :as io]))
+    (:require [clojure.set :as set]
+              [clojure.string :as string]
+              [clojure.java.io :as io]
+              [invu.util :as util]))
 
 (defonce endl "\n")
 
@@ -16,7 +17,7 @@
 (defmethod log :log-state [_ state]
     (with-open [wrtr (io/writer "log-state.txt" :append true)]
         (.write wrtr (fmtln "Tick:" (:tick @state)))
-        (.write wrtr (fmtln "Active Players:" (count (apply set/union (vals (:active-players @state))))))
+        (.write wrtr (fmtln "Active Players:"  (util/count-active-players (:active-players @state))))
         (.write wrtr (fmt "Bridge: ")) 
         (let [bridge (into (sorted-map) (dissoc (:active-players @state) 0))]
             (doseq [[step players] bridge]
@@ -54,16 +55,28 @@
 
 (defmethod log :test-jump 
     [_ player fuzzy-coop fuzzy-aggr coop-desire wtl-desire common-coop will-jump]
-        (with-open [wrtr (io/writer "test-jump.txt" :append true)]
-          (.write wrtr 
-              (fmtln 
-                (:id player)
-                @(:cooperation player)
-                @(:aggression player)
-                @(:will-to-live player)
-                fuzzy-coop
-                fuzzy-aggr
-                coop-desire
-                wtl-desire
-                common-coop
-                will-jump))))
+        (with-open [wrtr (io/writer "test-jumps.txt" :append true)]
+            (.write wrtr 
+                (fmtln 
+                    (:id player)
+                    @(:cooperation player)
+                    @(:aggression player)
+                    @(:will-to-live player)
+                    fuzzy-coop
+                    fuzzy-aggr
+                    coop-desire
+                    wtl-desire
+                    common-coop
+                    will-jump))))
+
+(defmethod log :log-players [_ state]
+    (let [active-players (apply set/union (vals (:active-players @state)))]
+        (with-open [wrtr (io/writer "log-players.txt" :append true)]
+            (doseq [player active-players]
+                (.write wrtr
+                    (fmtln
+                        (:id player)
+                        @(:location player)
+                        @(:will-to-live player)
+                        @(:aggression player)
+                        @(:cooperation player)))))))
