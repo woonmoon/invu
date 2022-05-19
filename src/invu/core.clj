@@ -1,10 +1,10 @@
 (ns invu.core
-  (:import (javax.swing JPanel))
   (:require [clojure.set :as set]
             [invu.util :as util]
             [invu.player :as players]
             [invu.logger :as log]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [clojure.edn :as edn])
   (:gen-class))
 
 (defonce new-state
@@ -16,6 +16,7 @@
           :tick 0 
           :moves-made 0
           :chance-of-death 0
+          :jump-misfortune 0
           :common-cooperation 0.75
           :tempered-steps {} 
         }))
@@ -111,6 +112,7 @@
 ;; ==> chance-of-death = (active-players - ticks-left) / active-players
 ;; if (active-players - ticks-left) = 0:
 ;; ==> chance-of-death = 0
+;; Implement a panic that kicks in at consecutive number of delta increasing.
 (defn delta-chance-of-death [state]
   (let [old-chance-of-death (:chance-of-death @state)
         time-left (- (:timer @state) (:tick @state))
@@ -122,6 +124,12 @@
             (util/safe-div players-to-die num-active-players))]
     (swap! state assoc :chance-of-death new-chance-of-death)
     (- old-chance-of-death new-chance-of-death)))
+
+(defn delta-jump-misfortune [state]
+  (let [old-jump-misfortune (:jump-misfortune @state)
+        new-jump-misfortune (util/zero-div (count (:dead-players @state)) (:moves-made @state))]
+    (swap! state assoc :jump-misfortune new-jump-misfortune)
+    (- old-jump-misfortune new-jump-misfortune)))
 
 (defn end-of-bridge [state player]
   (let [[last-step correct-last-step] (first (last (:tempered-steps @state)))]
@@ -138,9 +146,6 @@
         leading-player (first (get-in @state [:active-players leading-step]))
         correct-step (get-in @state [:tempered-steps leading-step])
         common-knowledge (:common-knowledge @state)]
-    ;; (println "leading-step" leading-step)
-    ;; (println "leading-player" (:id leading-player))
-    ;; (println "correct-step" correct-step)
     (when (not (no-new-knowledge state leading-step))
       (if (= leading-step (first (last (:tempered-steps @state))))
         (end-of-bridge state leading-player)
@@ -154,8 +159,13 @@
     (swap! state update :common-knowledge #(into (sorted-map) %)))
   (let [active-players (apply set/union (vals (:active-players @state)))
         delta-common-cooperation (delta-common-cooperation state)
-        delta-chance-of-death (delta-chance-of-death state)]
-    (map #(players/update-cooperation % delta-common-cooperation) active-players)))
+        delta-chance-of-death (delta-chance-of-death state)
+        delta-jump-misfortune (delta-jump-misfortune state)]
+    (doseq [player active-players]
+      (players/update-cooperation player delta-common-cooperation)
+      (players/update-will-to-live player delta-chance-of-death)
+      (players/update-aggression player delta-jump-misfortune)
+)))
 
 (defn tick [state]
   (swap! state update :tick inc)
@@ -171,8 +181,10 @@
     (tick new-state)))
 
 (defn -main [& args]
-  (init-state new-state 5 10)
-  (spawn-players new-state 3)
-  (log/log :log-state new-state)
-  (start-simulation new-state)
-  (shutdown-agents))
+  (let [config (edn/read-string (slurp "config.edn"))]
+    (init-state new-state (:num-steps config) (:num-ticks config))
+    (spawn-players new-state (:num-players config))
+    (log/log :log-state new-state)
+    (start-simulation new-state)
+    (shutdown-agents))
+)

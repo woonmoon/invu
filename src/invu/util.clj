@@ -41,6 +41,15 @@
                 1
                 (/ x# y#))))
 
+
+(defmacro zero-div [x y]
+    "Returns x/y if the divisor is 1 returns 0 (used for updating state thresholds)"
+    `(let [x# ~x
+            y# ~y]
+            (if (zero? y#)
+                0
+                (/ x# y#))))
+
 (defmacro reinforce-value [value indicator learning-rate threshold]
     `(let [value# ~value
             indicator# ~indicator

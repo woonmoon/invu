@@ -42,12 +42,15 @@
 (defprotocol Player
     (will-move [player common-knowledge common-cooperation])
     (move [player common-knowledge])
-    (update-cooperation [player delta-common-cooperation]))
+    (update-cooperation [player delta-common-cooperation])
+    (update-will-to-live [player delta-chance-of-death])
+    (update-aggression [player delta-jump-misfortune]))
 
 ;; Common Cooperation [0, 1]
 ;; Mean average of how many moves have been made so far.
 ;; ==> moves-made++ if any player jumps in that tick
 ;; ==> common-cooperation = moves-made / current-tick
+;; There is a flaw with this: consider the case where you are the last surviving agent.
 ;; Changes in common cooperation updates individual agent's cooperation
 ;; 
 ;; Cooperation [0, 1]
@@ -133,6 +136,20 @@
                     0)]
             (reset! (:cooperation player) new-cooperation)))
     
-    ;; (update-aggression [player]
-    ;;     )
-    )
+    (update-will-to-live [player delta-chance-of-death]
+        (let [new-will-to-live
+                (util/reinforce-value
+                    @(:will-to-live player)
+                    delta-chance-of-death
+                    0.2
+                    0)]
+            (reset! (:will-to-live player) new-will-to-live)))
+            
+    (update-aggression [player delta-jump-misfortune]
+        (let [new-aggression
+                (util/reinforce-value
+                    @(:aggression player)
+                    delta-jump-misfortune
+                    0.2
+                    0)]
+            (reset! (:aggression player) new-aggression))))
