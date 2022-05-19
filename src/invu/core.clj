@@ -103,7 +103,7 @@
 ;;    common-cooperation = common-cooperation - 0.2 * common-cooperation
 (defn delta-common-cooperation [state]
   (let [old-common-coop (:common-cooperation @state)
-        update-threshold (util/safe-div (:moves-made @state) (:tick @state))
+        update-threshold (util/one-div (:moves-made @state) (:tick @state))
         new-common-coop (util/reinforce-value old-common-coop update-threshold 0.2 0.5)]
     (swap! state assoc :common-cooperation new-common-coop)
     (- old-common-coop new-common-coop)))
@@ -121,7 +121,7 @@
         new-chance-of-death 
           (if (neg? players-to-die) 
             0 
-            (util/safe-div players-to-die num-active-players))]
+            (util/one-div players-to-die num-active-players))]
     (swap! state assoc :chance-of-death new-chance-of-death)
     (- old-chance-of-death new-chance-of-death)))
 
@@ -132,7 +132,7 @@
     (- old-jump-misfortune new-jump-misfortune)))
 
 (defn end-of-bridge [state player]
-  (let [[last-step correct-last-step] (first (last (:tempered-steps @state)))]
+  (let [[last-step correct-last-step] (last (:tempered-steps @state))]
     (if (= @(:decision player) correct-last-step)
       (survive state player)
       (kill state last-step player))))
@@ -150,8 +150,8 @@
       (if (= leading-step (first (last (:tempered-steps @state))))
         (end-of-bridge state leading-player)
         (when (not= correct-step @(:decision leading-player))
-          (kill state leading-step leading-player))))
-    [leading-step correct-step]))
+          (kill state leading-step leading-player)))
+      [leading-step correct-step])))
 
 (defn end-of-tick [state]
   (when-let [[step knowledge] (new-knowledge state)]
@@ -164,8 +164,7 @@
     (doseq [player active-players]
       (players/update-cooperation player delta-common-cooperation)
       (players/update-will-to-live player delta-chance-of-death)
-      (players/update-aggression player delta-jump-misfortune)
-)))
+      (players/update-aggression player delta-jump-misfortune))))
 
 (defn tick [state]
   (swap! state update :tick inc)

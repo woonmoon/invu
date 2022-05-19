@@ -33,7 +33,7 @@
             minimum-threshold# ~minimum-threshold]
         (- x# minimum-threshold#)))
 
-(defmacro safe-div [x y]
+(defmacro one-div [x y]
     "Returns x/y if the divisor is 0 returns 1 (used for updating state thresholds)"
     `(let [x# ~x
             y# ~y]
