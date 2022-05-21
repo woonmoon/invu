@@ -69,11 +69,24 @@
     (when (and (empty? (get @bridge next-step)) (<= next-step (count @bridge)))
       next-step)))
 
+;; (def bar [nil 1 nil nil 2 nil nil])
+
+;; (defn move [bridge]
+;;     (drop 1
+;;         (reduce 
+;;             (fn [bridge tile]
+;;                 (if (and (some? tile) (nil? (last bridge)) (= tile 2))
+;;                     (conj (pop bridge) tile nil)
+;;                     (conj bridge tile)))
+;;             [nil]
+;;             bridge)))
+      
 (defn maybe-move [state]
-  (let [platform (get-in state [:active-players 0])
+  (let [platform (get-in state [:active-players 0]) 
         bridge (atom (into (sorted-map-by >) (dissoc (:active-players state) 0)))
         common-knowledge (:common-knowledge state)
         common-cooperation (:common-cooperation state)]
+    ;; Potentially use reduce.
     (doseq [[step players] @bridge]
       (when-let [player (first players)]
         (when-let [next-step (next-step-available step bridge)]
