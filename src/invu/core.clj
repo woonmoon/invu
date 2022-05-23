@@ -22,94 +22,74 @@
           :tempered-steps {} 
         }))
 
-;; (defonce new-new-state
-;;   {
-;;     :platform #{}
-;;     :bridge {}
-;;     :dead-playerers #{}
-;;     :survivors #{}
-;;     :common-knowledge {}
-;;     :tick 0
-;;     :moves-made 0
-;;     :chance-of-death 0
-;;     :jump-misfortune 0
-;;     :common-cooperation 0.75
-;;   })
+(defrecord State
+  [
+    platform 
+    bridge
+    dead-players
+    survivors
+    common-knowledge 
+    tick 
+    moves-made 
+    chance-of-death 
+    jump-misfortune 
+    common-cooperation
+  ])
 
-(defn init-state [state num-steps num-ticks]
+(defn spawn-players [num-players]
+  (repeatedly num-players 
+    #(players/->Random 
+        (gensym "Player") 
+        (atom 0) 
+        (atom (rand)) 
+        (atom (rand))
+        (atom (rand)) 
+        (atom nil))))
+
+(defn id-to-players [num-players]
+  (let [players (spawn-players num-players)]
+    (zipmap (map #(:id %) players) players)))
+
+(defn init-state [state num-steps num-ticks id-to-players]
   (let [num-entries (inc num-steps)
         bridge (zipmap 
                   (range 1 num-entries)
-                  (take (dec num-entries) (repeat nil)))
+                  (take num-steps (repeat nil)))
         tempered-steps (into (sorted-map)
                           (zipmap
                             (range 1 num-entries)
-                            (take num-steps (repeatedly #(rand-int 2)))))]
-    (swap! state assoc :bridge bridge)
-    (swap! state assoc :tempered-steps tempered-steps)
-    (swap! state assoc :timer num-ticks)))
+                            (take num-steps (repeatedly #(rand-int 2)))))
+        players (keys id-to-players)]
+    (->State players bridge #{} #{} {} 0 0 0 0 0.7)))
 
-(defn spawn-players [state num-players]
-  (let [players 
-          (into #{}
-            (repeatedly num-players 
-              #(players/->Random 
-                  (gensym "Player") 
-                  (atom 0) 
-                  (atom (rand)) 
-                  (atom (rand))
-                  (atom (rand)) 
-                  (atom nil))))]
-    (swap! state assoc :platform players)))
+(defn moving-players [active-ids id-to-players common-knowledge common-cooperation]
+  "Returns a map of ids and desires of players who are willing to move"
+  (let [active-players (vals (select-keys id-to-players active-ids))]
+    (into 
+      {}
+      (map 
+        #(players/will-move % common-knowledge common-cooperation) 
+        active-players))))
 
-(defn maybe-jump [state]
-  "I volunteer as tribute!"
-  (let [candidates (:platform state)
-        tributes (into (sorted-map) 
-                    (remove nil?
-                      (map 
-                        #(players/will-move % (:common-knowledge state) (:common-cooperation state)) 
-                        candidates)))]
-    (if (or (empty? tributes) (some? (get-in state [:bridge 1])))
-      state
-      (let [chosen-one (second (first tributes))
-            disjoint-state (update state :platform disj chosen-one)
-            moved-state (assoc-in disjoint-state [:bridge 1] chosen-one)]
-        (players/move chosen-one (:common-knowledge state))
-        (update moved-state :moves-made inc)))))
+(defn move-bridge-players [state moving-players last-player]
+  "Returns the modified bridge, where in the last element represents survivors"
+  (reverse
+    (reduce
+      (fn [players player]
+        (if (and 
+              (some? player) 
+              (nil? (last players))
+              (or
+                (contains? moving-players players)
+                (= player last-player)))
+          (conj (pop players) player nil)
+          (conj players player)))
+      [nil]
+      (reverse (vals (:bridge state))))))
 
-(defn next-step-available [location bridge]
-  "Check if the next step of the bridge is occupied or not."
-  (let [next-step (inc location)]
-    (when (and (nil? (get @bridge next-step)) (<= next-step (count @bridge)))
-      next-step)))
-
-;; (def bar [nil 1 nil nil 2 nil nil])
-
-;; (defn move [bridge]
-;;     (drop 1
-;;         (reduce 
-;;             (fn [bridge tile]
-;;                 (if (and (some? tile) (nil? (last bridge)) (= tile 2))
-;;                     (conj (pop bridge) tile nil)
-;;                     (conj bridge tile)))
-;;             [nil]
-;;             bridge)))
-      
-(defn maybe-move [state]
-  (let [platform (:platform state) 
-        bridge (atom (into (sorted-map-by >) (:bridge state)))
-        common-knowledge (:common-knowledge state)
-        common-cooperation (:common-cooperation state)]
-    ;; Potentially use reduce.
-    (doseq [[step maybe-player] @bridge]
-      (when-let [player maybe-player]
-        (when-let [next-step (next-step-available step bridge)]
-          (when-let [player-move (players/will-move player common-knowledge common-cooperation)]
-            (players/move player common-knowledge)
-            (swap! bridge assoc step nil)
-            (swap! bridge assoc next-step player)))))
-    (assoc state :bridge @bridge)))
+(defn update-bridge []
+  (let []
+    ))
 
 (defn find-leading-step [bridge]
   (if (empty? (remove nil? (vals bridge)))

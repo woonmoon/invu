@@ -105,7 +105,7 @@
                 (or (contains? common-knowledge (inc @(:location player))) 
                     (and (pos? cooperation-desire) (pos? will-to-live-desire)))]
             ;; Tragic, but not the top of my problems.
-            (log/log :test-jump
+            (log/log :test-jump 
                 player
                 fuzzy-cooperation
                 fuzzy-aggression
@@ -115,9 +115,9 @@
                 will-jump)
             (cond
                 (contains? common-knowledge (inc @(:location player))) 
-                    [1.0 player]
+                    [(:id player) 1.0]
                 (and (pos? cooperation-desire) (pos? will-to-live-desire))
-                    [(+ cooperation-desire will-to-live-desire) player])))
+                    [(:id player) (+ cooperation-desire will-to-live-desire)])))
 
     (move [player common-knowledge]
         (let [location @(:location player)
