@@ -15,9 +15,8 @@
     "Generates number between lower-bound (inclusive) and upwards by offset (exclusive)"
     (rand-range lower-bound (+ lower-bound offset)))
 
-(defn count-active-players [active-players]
-    "Returns number of active players when given a mapping of step to player hashmap"
-    (reduce + (map count (vals active-players))))
+(defn get-active-players [state]
+    (concat (keep identity (vals (:bridge @state))) (:platform @state)))
 
 (defmacro fuzzy-label [thresholds x]
     "Returns correct fuzzy label given thresholds and score x."

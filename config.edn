@@ -1,5 +1,5 @@
 {
-    :num-players 3
+    :num-players 5
     :num-steps 5
-    :num-ticks 10
+    :num-ticks 5
 }

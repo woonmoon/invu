@@ -17,11 +17,11 @@
 (defmethod log :log-state [_ state]
     (with-open [wrtr (io/writer "log-state.txt" :append true)]
         (.write wrtr (fmtln "Tick:" (:tick @state)))
-        (.write wrtr (fmtln "Active Players:"  (util/count-active-players (:active-players @state))))
+        (.write wrtr (fmtln "Active Players:" (count (util/get-active-players state))))
         (.write wrtr (fmt "Bridge: ")) 
-        (let [bridge (into (sorted-map) (dissoc (:active-players @state) 0))]
-            (doseq [[step players] bridge]
-                (.write wrtr (fmt "{" step ":" (into [] (map #(:id %) players)) "} "))))
+        (let [bridge (:bridge @state)]
+            (doseq [[step player] bridge]
+                (.write wrtr (fmt "{" step ":" (:id player) "} "))))
         (.write wrtr endl)
         (.write wrtr (fmtln "Dead Players:" (count (:dead-players @state))))
         (.write wrtr (fmtln "Survivors:" (count (:survivors @state))))
@@ -35,7 +35,7 @@
 
 (defmethod log :log-player [_ state]
     (with-open [wrtr (io/writer "log-players.txt" :append true)]
-        (let [active-players (:active-players @state)]
+        (let [active-players (util/get-active-players state)]
             (doseq [[step players] active-players
                     player players]
                 (.write wrtr
@@ -70,7 +70,7 @@
                     will-jump))))
 
 (defmethod log :log-players [_ state]
-    (let [active-players (apply set/union (vals (:active-players @state)))]
+    (let [active-players (util/get-active-players state)]
         (with-open [wrtr (io/writer "log-players.txt" :append true)]
             (doseq [player active-players]
                 (.write wrtr
