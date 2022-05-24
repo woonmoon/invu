@@ -62,7 +62,7 @@
         players (keys id-to-players)]
     (->State players bridge #{} #{} {} 0 0 0 0 0.7)))
 
-(defn moving-players [active-ids id-to-players common-knowledge common-cooperation]
+(defn player-to-will-to-move [active-ids id-to-players common-knowledge common-cooperation]
   "Returns a map of ids and desires of players who are willing to move"
   (let [active-players (vals (select-keys id-to-players active-ids))]
     (into 
@@ -71,25 +71,38 @@
         #(players/will-move % common-knowledge common-cooperation) 
         active-players))))
 
-(defn move-bridge-players [state moving-players last-player]
-  "Returns the modified bridge, where in the last element represents survivors"
+
+(defn shift-players [players-on-bridge moving-players last-player]
+  "Given a flat list of players on the bridge (empty tiles represented by nil)
+  shifts willing players up by one step (player at the end always moves).
+  The last element if non-nil represents survivors"
   (reverse
     (reduce
       (fn [players player]
         (if (and 
               (some? player) 
-              (nil? (last players))
-              (or
-                (contains? moving-players players)
-                (= player last-player)))
+              (nil? (last players)) 
+              (or (contains? moving-players player) (= player last-player)))
           (conj (pop players) player nil)
           (conj players player)))
       [nil]
-      (reverse (vals (:bridge state))))))
+      players-on-bridge)))
 
-(defn update-bridge []
-  (let []
-    ))
+(defn most-willing-player [platform moving-players]
+  "If exists returns the most willing player to jump off platform 
+  else returns nil"
+  (let [willing-players 
+          (into 
+            {} 
+            (filter (comp some? val) (select-keys moving-players platform)))]
+    (when (seq willing-players)
+      (key (apply max-key willing-players)))))
+
+(defn update-platform [platform jumping-player]
+  "Given the player that will jump returns the updated platform."
+  (disj platform jumping-player))
+
+(defn update-state)
 
 (defn find-leading-step [bridge]
   (if (empty? (remove nil? (vals bridge)))
