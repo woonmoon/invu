@@ -71,23 +71,6 @@
         #(players/will-move % common-knowledge common-cooperation) 
         active-players))))
 
-
-(defn shift-players [players-on-bridge moving-players last-player]
-  "Given a flat list of players on the bridge (empty tiles represented by nil)
-  shifts willing players up by one step (player at the end always moves).
-  The last element if non-nil represents survivors"
-  (reverse
-    (reduce
-      (fn [players player]
-        (if (and 
-              (some? player) 
-              (nil? (last players)) 
-              (or (contains? moving-players player) (= player last-player)))
-          (conj (pop players) player nil)
-          (conj players player)))
-      [nil]
-      players-on-bridge)))
-
 (defn most-willing-player [platform moving-players]
   "If exists returns the most willing player to jump off platform 
   else returns nil"
@@ -102,22 +85,61 @@
   "Given the player that will jump returns the updated platform."
   (disj platform jumping-player))
 
-(defn update-state)
+; You jump when
+; 1) You are the last person - survival guaranteed.
+; 2) You are already willing to jump, the next step is free and.
+(defn tile-available? [step final-step next-player]
+  "Checks if the next tile is unoccupied or there are no more tiles."
+  (or (= step final-step) (nil? next-player)))
 
-(defn find-leading-step [bridge]
-  (if (empty? (remove nil? (vals bridge)))
-    0
-    (first 
-      (first 
-        (filter #(some? (second %)) (reverse bridge))))))
+(defn move-bridge [bridge moving-players tempered-tiles]
+  "Returns a new bridge."
+  (let [final-step (last (keys bridge))]
+    (reduce-kv
+      (fn [acc-bridge step player]
+        (let [last-player 
+                (second (last acc-bridge))
+              tile-available 
+                (tile-available? step final-step last-player)
+              is-willing 
+                (contains? moving-players player)
+              has-survived 
+                (= (rand-int 2) (get tempered-tiles step))]
+          (cond
+              (and is-willing tile-available has-survived)
+                  (assoc acc-bridge (inc step) player step nil)
+              (and is-willing tile-available (not has-survived))
+                  (assoc acc-bridge (inc step) nil step nil)
+              :else
+                  (assoc acc-bridge step player))))
+      (into (sorted-map-by >) {(inc final-step) nil})
+      (into (sorted-map-by >) bridge))))
 
-(defn kill [state step player]
-  (swap! state assoc-in [:bridge step] nil)
-  (swap! state update-in [:dead-players] conj player))
+;; Platform -> Bridge
+;; Platform -> Death
+;; Bridge -> Death
+;; Bridge -> Bridge
+;; Bridge -> Survivor
+;; Delta Bridge + Delta Death + Delta Survivor = Moves Made
+(defn delta-bridge-moves [new-bridge old-bridge]
+;; Delta (num of nils) -> died and survived
+  )
 
-(defn survive [state player]
-  (swap! state assoc-in [:bridge (first (last (:tempered-steps @state)))] nil)
-  (swap! state update-in [:survivors] conj player))
+(defn update-state [state moving-players tempered-tiles]
+  (let [new-bridge (move-bridge (:bridge state) moving-players tempered-tiles)]
+    ;; Check for survivors
+    (when (val (last new-bridge))
+      (let))
+    ;; Check for jumpers (off the platform)
+    ;; Check for who died
+    ;; Check how many moves were made 
+    ;; moves-made = delta deaths + delta survivors + delta changed positions
+    ;; update ticks
+    ;; update common cooperation
+    ;; update chance of death
+    ;; update jump misfortune
+    ;; update common cooperation
+))
 
 ;; update-threshold = moves-made / ticks
 ;; if update-threshold > 0.5:
@@ -193,8 +215,7 @@
     (doseq [player active-players]
       (players/update-cooperation player delta-common-cooperation)
       (players/update-will-to-live player delta-chance-of-death)
-      (players/update-aggression player delta-jump-misfortune))
-      ))
+      (players/update-aggression player delta-jump-misfortune))))
 
 (defn tick [state]
   (swap! state update :tick inc)
