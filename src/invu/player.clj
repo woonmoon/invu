@@ -85,7 +85,12 @@
 ;; Mid (0.6) | 0.6 / 0.8 | 0.6 / 0.7 | 0.6 / 0.6 | 0.6 / 0.5 | 0.6 / 0.4
 ;; Lo  (0.4) | 0.7 / 0.8 | 0.7 / 0.7 | 0.7 / 0.6 | 0.7 / 0.5 | 0.7 / 0.4
 ;; VLo (0.2) | 0.8 / 0.8 | 0.8 / 0.7 | 0.8 / 0.6 | 0.8 / 0.5 | 0.8 / 0.4
-
+;; 
+;; What particular initial configurations of the agent config lead to what outcome of what
+;; state.
+;; Suppose you could record this data, how is a next population going to react/evolve.
+;; Look at yourself and say classifier- what's going to happen to us?
+;; Do we go ahead and do this or do we change?
 (defrecord Random [id location will-to-live aggression cooperation decision] Player
     (will-move [player common-knowledge common-cooperation]
         (let 
