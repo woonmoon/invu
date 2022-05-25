@@ -1,5 +1,6 @@
 (ns invu.core
   (:require [clojure.set :as set]
+            [clojure.data :as data]
             [invu.util :as util]
             [invu.player :as players]
             [invu.logger :as log]
@@ -62,6 +63,7 @@
         players (keys id-to-players)]
     (->State players bridge #{} #{} {} 0 0 0 0 0.7)))
 
+;; BREAKING
 (defn player-to-will-to-move [active-ids id-to-players common-knowledge common-cooperation]
   "Returns a map of ids and desires of players who are willing to move"
   (let [active-players (vals (select-keys id-to-players active-ids))]
@@ -85,13 +87,6 @@
   "Given the player that will jump returns the updated platform."
   (disj platform jumping-player))
 
-; You jump when
-; 1) You are the last person - survival guaranteed.
-; 2) You are already willing to jump, the next step is free and.
-(defn tile-available? [step final-step next-player]
-  "Checks if the next tile is unoccupied or there are no more tiles."
-  (or (= step final-step) (nil? next-player)))
-
 (defn move-bridge [bridge moving-players tempered-tiles]
   "Returns a new bridge."
   (let [final-step (last (keys bridge))]
@@ -100,7 +95,7 @@
         (let [last-player 
                 (second (last acc-bridge))
               tile-available 
-                (tile-available? step final-step last-player)
+                (or (= step final-step) (nil? last-player))
               is-willing 
                 (contains? moving-players player)
               has-survived 
@@ -115,94 +110,75 @@
       (into (sorted-map-by >) {(inc final-step) nil})
       (into (sorted-map-by >) bridge))))
 
-;; Platform -> Bridge
-;; Platform -> Death
-;; Bridge -> Death
-;; Bridge -> Bridge
-;; Bridge -> Survivor
-;; Delta Bridge + Delta Death + Delta Survivor = Moves Made
-(defn delta-bridge-moves [new-bridge old-bridge]
-;; Delta (num of nils) -> died and survived
-  )
+(defn moves-made [old-bridge new-bridge]
+  "Returns the number of moves made in the tick."
+;; NOTE(woonmoon): This works because each player maps onto a step and if
+;; no moves or made that player-tile mapping stays the same. The only
+;; reason the mapping would have changed is if the player moved.
+  (count 
+    (into #{}
+      (flatten
+        (map 
+          keys
+          (drop-last
+            (data/diff 
+              (dissoc (set/map-invert new-bridge) nil) 
+              (dissoc (set/map-invert old-bridge) nil))))))))
 
-(defn update-state [state moving-players tempered-tiles]
-  (let [new-bridge (move-bridge (:bridge state) moving-players tempered-tiles)]
-    ;; Check for survivors
-    (when (val (last new-bridge))
-      (let))
-    ;; Check for jumpers (off the platform)
-    ;; Check for who died
-    ;; Check how many moves were made 
-    ;; moves-made = delta deaths + delta survivors + delta changed positions
-    ;; update ticks
-    ;; update common cooperation
-    ;; update chance of death
-    ;; update jump misfortune
-    ;; update common cooperation
-))
+(defn deceased-players [old-bridge new-bridge]
+  (remove nil?
+    (set/difference 
+      (into #{} (vals new-bridge)) 
+      (into #{} (vals old-bridge)))))
 
 ;; update-threshold = moves-made / ticks
 ;; if update-threshold > 0.5:
 ;;    common-cooperation = common-cooperation + 0.2 * (1 - common-cooperation)
 ;; else:
 ;;    common-cooperation = common-cooperation - 0.2 * common-cooperation
-(defn delta-common-cooperation [state]
-  (let [old-common-coop (:common-cooperation @state)
-        update-threshold (util/one-div (:moves-made @state) (:tick @state))
-        new-common-coop (util/reinforce-value old-common-coop update-threshold 0.2 0.5)]
-    (swap! state assoc :common-cooperation new-common-coop)
-    (- old-common-coop new-common-coop)))
+(defn new-common-cooperation [old-common-cooperation moves-made current-tick]
+  (let [update-threshold (util/one-div moves-made current-tick)]
+    (util/reinforce-value old-common-cooperation update-threshold 0.2 0.5)))
 
 ;; Chance of certain death [0, 1]
+;; time-left = time-total - current-tick
 ;; ==> chance-of-death = (active-players - ticks-left) / active-players
 ;; if (active-players - ticks-left) = 0:
 ;; ==> chance-of-death = 0
 ;; Implement a panic that kicks in at consecutive number of delta increasing.
-(defn delta-chance-of-death [state]
-  (let [old-chance-of-death (:chance-of-death @state)
-        time-left (- (:timer @state) (:tick @state))
-        num-active-players (count (util/get-active-players state))
-        players-to-die (- num-active-players time-left)
-        new-chance-of-death 
-          (if (neg? players-to-die) 
-            0 
-            (util/one-div players-to-die num-active-players))]
-    (swap! state assoc :chance-of-death new-chance-of-death)
-    (- old-chance-of-death new-chance-of-death)))
+(defn new-chance-of-death [old-chance-of-death time-left num-active-players]
+  (let [players-to-die (- num-active-players time-left)]
+    (if (neg? players-to-die) 
+      0 
+      (util/one-div players-to-die num-active-players))))
 
-(defn delta-jump-misfortune [state]
-  (let [old-jump-misfortune (:jump-misfortune @state)
-        new-jump-misfortune (util/zero-div (count (:dead-players @state)) (:moves-made @state))]
-    (swap! state assoc :jump-misfortune new-jump-misfortune)
-    (- old-jump-misfortune new-jump-misfortune)))
+(defn new-jump-misfortune [num-deaths moves-made]
+  (util/zero-div num-deaths moves-made))
 
-(defn end-of-bridge [state player]
-  (let [[last-step correct-last-step] (last (:tempered-steps @state))]
-    (if (= @(:decision player) correct-last-step)
-      (survive state player)
-      (kill state last-step player))))
-
-(defn no-new-knowledge [state leading-step]
-  (or (contains? (:common-knowledge @state) leading-step) 
-      (= 0 leading-step)))
-
-(defn new-knowledge [state]
-  (if (empty? (remove nil? (vals (:bridge @state))))
-    ;; Nobody on the bridge
-    nil 
-    (let [leading-step (find-leading-step (into (sorted-map) (:bridge @state)))
-          leading-player (get-in @state [:bridge leading-step])
-          correct-step (get-in @state [:tempered-steps leading-step])]
-      (if (contains? (:common-knowledge @state) leading-step)
-        ;; Leading player has not moved
-        nil
-        (if (= leading-step (first (last (:tempered-steps @state))))
-          ;; Someone has reached the end of the bridge
-          (end-of-bridge state leading-player)
-          (do
-            (when (not= correct-step @(:decision leading-player))
-              (kill state leading-step leading-player))
-            [leading-step correct-step]))))))
+(defn update-state [state moving-players tempered-tiles total-time]
+  ;; Check how many moves were made 
+  (let [platform (:platform state)
+        bridge (:bridge state)
+        current-tick (:tick state)
+        old-common-cooperation (:common-cooperation state)
+        old-chance-of-death (:chance-of-death state)
+        new-bridge (into (sorted-map) (move-bridge bridge moving-players tempered-tiles))
+        moves-made (+ (moves-made bridge new-bridge) (:moves-made state))
+        time-left (- total-time current-tick)
+        ;; who died this tick
+        dead-players (deceased-players bridge new-bridge)
+        num-active-players (+ (count platform) (remove nil? (vals new-bridge)))
+        ;; update common cooperation
+        new-common-cooperation (new-common-cooperation old-common-cooperation moves-made current-tick)
+        ;; update chance of death
+        new-chance-of-death (new-chance-of-death old-chance-of-death time-left num-active-players)
+        ;; update jump misfortune
+        new-jump-misfortune (new-jump-misfortune (count dead-players) moves-made)
+        ;; survivors 
+        survivors (val (last new-bridge))
+        ;; jumped off the platform
+        jumpers (most-willing-player platform moving-players)]
+    ))
 
 (defn end-of-tick [state]
   (when-let [[step knowledge] (new-knowledge state)]
