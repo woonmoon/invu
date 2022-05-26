@@ -91,13 +91,13 @@
 ;; Suppose you could record this data, how is a next population going to react/evolve.
 ;; Look at yourself and say classifier- what's going to happen to us?
 ;; Do we go ahead and do this or do we change?
-(defrecord Random [id location will-to-live aggression cooperation decision] Player
+(defrecord Random [id location will-to-live aggression cooperation] Player
     (will-move [player common-knowledge common-cooperation]
         (let 
             [fuzzy-cooperation 
-                (util/fuzzy-label cooperation-thresholds @(:cooperation player))
+                (util/fuzzy-label cooperation-thresholds (:cooperation player))
              fuzzy-aggression 
-                (util/fuzzy-label aggression-thresholds @(:aggression player))
+                (util/fuzzy-label aggression-thresholds (:aggression player))
              min-common-cooperation
                 (get cooperation-to-min-common-cooperation fuzzy-cooperation)
              min-will-to-live
@@ -105,9 +105,9 @@
              cooperation-desire 
                 (util/desire min-common-cooperation common-cooperation)
              will-to-live-desire
-                (util/desire min-will-to-live @(:will-to-live player))
+                (util/desire min-will-to-live (:will-to-live player))
              will-jump
-                (or (contains? common-knowledge (inc @(:location player))) 
+                (or (contains? common-knowledge (inc (:location player))) 
                     (and (pos? cooperation-desire) (pos? will-to-live-desire)))]
             ;; Tragic, but not the top of my problems.
             (log/log :test-jump 
@@ -119,42 +119,35 @@
                 common-cooperation
                 will-jump)
             (cond
-                (contains? common-knowledge (inc @(:location player))) 
+                (contains? common-knowledge (inc (:location player))) 
                     [(:id player) 1.0]
                 (and (pos? cooperation-desire) (pos? will-to-live-desire))
                     [(:id player) (+ cooperation-desire will-to-live-desire)])))
 
-    (move [player common-knowledge]
-        (let [location @(:location player)
-          knowledge-available (contains? common-knowledge (inc location))
-          next-step (if knowledge-available (get common-knowledge (inc location))
-                                            (rand-int 2))]
-            (reset! (:decision player) next-step)
-            (swap! (:location player) inc)))
+    ;; (update-cooperation [player delta-common-cooperation]
+    ;;     (let [new-cooperation 
+    ;;             (util/reinforce-value 
+    ;;                 (:cooperation player) 
+    ;;                 delta-common-cooperation 
+    ;;                 0.2 
+    ;;                 0)]
+    ;;         (reset! (:cooperation player) new-cooperation)))
     
-    (update-cooperation [player delta-common-cooperation]
-        (let [new-cooperation 
-                (util/reinforce-value 
-                    @(:cooperation player) 
-                    delta-common-cooperation 
-                    0.2 
-                    0)]
-            (reset! (:cooperation player) new-cooperation)))
-    
-    (update-will-to-live [player delta-chance-of-death]
-        (let [new-will-to-live
-                (util/reinforce-value
-                    @(:will-to-live player)
-                    delta-chance-of-death
-                    0.2
-                    0)]
-            (reset! (:will-to-live player) new-will-to-live)))
+    ;; (update-will-to-live [player delta-chance-of-death]
+    ;;     (let [new-will-to-live
+    ;;             (util/reinforce-value
+    ;;                 @(:will-to-live player)
+    ;;                 delta-chance-of-death
+    ;;                 0.2
+    ;;                 0)]
+    ;;         (reset! (:will-to-live player) new-will-to-live)))
             
-    (update-aggression [player delta-jump-misfortune]
-        (let [new-aggression
-                (util/reinforce-value
-                    @(:aggression player)
-                    delta-jump-misfortune
-                    0.2
-                    0)]
-            (reset! (:aggression player) new-aggression))))
+    ;; (update-aggression [player delta-jump-misfortune]
+    ;;     (let [new-aggression
+    ;;             (util/reinforce-value
+    ;;                 @(:aggression player)
+    ;;                 delta-jump-misfortune
+    ;;                 0.2
+    ;;                 0)]
+    ;;         (reset! (:aggression player) new-aggression)))
+            )

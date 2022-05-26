@@ -16,7 +16,7 @@
     (rand-range lower-bound (+ lower-bound offset)))
 
 (defn get-active-players [state]
-    (concat (keep identity (vals (:bridge @state))) (:platform @state)))
+    (concat (keep identity (vals (:bridge state))) (:platform state)))
 
 (defmacro fuzzy-label [thresholds x]
     "Returns correct fuzzy label given thresholds and score x."

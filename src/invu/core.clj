@@ -39,13 +39,7 @@
 
 (defn spawn-players [num-players]
   (repeatedly num-players 
-    #(players/->Random 
-        (gensym "Player") 
-        (atom 0) 
-        (atom (rand)) 
-        (atom (rand))
-        (atom (rand)) 
-        (atom nil))))
+    #(players/->Random (gensym "Player") 0 (rand) (rand) (rand))))
 
 (defn id-to-players [num-players]
   (->> (spawn-players num-players)
@@ -79,41 +73,38 @@
          (apply max-key val)
          (key))))
 
-(defn update-platform [platform jumping-player]
-  "Given the player that will jump returns the updated platform."
-  (disj platform jumping-player))
-
-(defn move-bridge [bridge moving-players tempered-tiles]
-  "Returns a new bridge."
+(defn move-on-bridge [bridge moving-players tempered-tiles common-knowledge]
+  "Returns a tuple of [new-bridge, survivors] where new-bridge is sorted (ascending)"
   (let [final-step (last (keys bridge))
         survivor-step (inc final-step)]
-    (reduce-kv
-      (fn [acc-bridge step player]
-        (let [last-step
-                (key (last acc-bridge))
-              last-player 
-                (val (last acc-bridge))
-              tile-available
-                (or (= step final-step) (nil? last-player))
-              is-willing 
-                (contains? moving-players player)
-              has-survived 
-                (= (rand-int 2) (get tempered-tiles step))]
-          (cond
-              (and is-willing tile-available has-survived)
-                  (assoc acc-bridge last-step player step nil)
-              (and is-willing tile-available (not has-survived))
-                  (assoc acc-bridge last-step nil step nil)
-              :else
-                  (assoc acc-bridge step player))))
-      (into (sorted-map-by >) {survivor-step nil})
-      (into (sorted-map-by >) bridge))))
+    (reverse
+      (reduce-kv
+        (fn [acc-bridge step player]
+          (let [last-step
+                  (key (last acc-bridge))
+                last-player 
+                  (val (last acc-bridge))
+                tile-available
+                  (or (= step final-step) (nil? last-player))
+                is-willing 
+                  (contains? moving-players player)
+                has-survived 
+                  (or (= (rand-int 2) (get tempered-tiles step))
+                      (contains? common-knowledge step))]
+            (cond
+                (and is-willing tile-available has-survived)
+                    (assoc acc-bridge last-step player step nil)
+                (and is-willing tile-available (not has-survived))
+                    (assoc acc-bridge last-step nil step nil)
+                :else
+                    (assoc acc-bridge step player))))
+        (into (sorted-map-by >) {survivor-step nil})
+        (into (sorted-map-by >) bridge)))))
 
 (defn moves-made [old-bridge new-bridge]
   "Returns the number of moves made in the tick."
-;; NOTE(woonmoon): This works because each player maps onto a step and if
-;; no moves or made that player-tile mapping stays the same. The only
-;; reason the mapping would have changed is if the player moved.
+;; NOTE(woonmoon): This works because each player maps onto a step and 
+;; the only reason a mapping would have changed is if the player moved.
   (let [old-players (dissoc (set/map-invert old-bridge) nil)
         new-players (dissoc (set/map-invert new-bridge) nil)
         difference (data/diff old-players new-players)]
@@ -121,11 +112,11 @@
         flatten
         count)))
 
-(defn deceased-players [old-bridge new-bridge]
-  (remove nil?
-    (set/difference 
-      (set (vals new-bridge)) 
-      (set (vals old-bridge)))))
+(defn deceased-players [old-bridge new-bridge already-dead]
+  (let [players #(-> % vals set (disj nil))]
+    (if-let [dead (seq (set/difference (players new-bridge) (players old-bridge)))]
+      (set (concat (seq already-dead) dead))
+      already-dead)))
 
 ;; update-threshold = moves-made / ticks
 ;; if update-threshold > 0.5:
@@ -133,58 +124,82 @@
 ;; else:
 ;;    common-cooperation = common-cooperation - 0.2 * common-cooperation
 (defn new-common-cooperation [old-common-cooperation moves-made current-tick]
-  (let [update-threshold (util/one-div moves-made current-tick)]
-    (util/reinforce-value old-common-cooperation update-threshold 0.2 0.5)))
+  (let [threshold (util/one-div moves-made current-tick)]
+    (util/reinforce-value old-common-cooperation threshold 0.2 0.5)))
 
-;; Chance of certain death [0, 1]
 ;; time-left = time-total - current-tick
-;; ==> chance-of-death = (active-players - ticks-left) / active-players
+;; chance-of-death = (active-players - ticks-left) / active-players
 ;; if (active-players - ticks-left) = 0:
 ;; ==> chance-of-death = 0
-;; Implement a panic that kicks in at consecutive number of delta increasing.
+;; TODO: Implement a panic that kicks in at consecutive number of delta increasing.
 (defn new-chance-of-death [old-chance-of-death time-left num-active-players]
   (let [players-to-die (- num-active-players time-left)]
     (if (neg? players-to-die) 
       0 
       (util/one-div players-to-die num-active-players))))
 
-(defn new-jump-misfortune [num-deaths moves-made]
-  (util/zero-div num-deaths moves-made))
+(defn jump-off-platform [platform bridge moving-players]
+  (let [brave-player (most-willing-player platform moving-players)]
+    (if (and brave-player (-> bridge first val nil?))
+      [(disj platform brave-player) (assoc bridge 1 brave-player)]
+      [platform bridge])))
 
-;; (defn update-state [state moving-players tempered-tiles total-time]
-;;   (let [new-bridge (into (sorted-map) (move-bridge bridge moving-players tempered-tiles))]
-;;     (when (val (last new-bridge))
-;;       ;; Survivors
-;;     )
-;;     (when (and (nil? (val (first new-bridge))))))
-;;   ;; Check how many moves were made 
-;;   (let [platform (:platform state)
-;;         bridge (:bridge state)
-;;         current-tick (:tick state)
-;;         old-common-cooperation (:common-cooperation state)
-;;         old-chance-of-death (:chance-of-death state)
-;;         new-bridge (into (sorted-map) (move-bridge bridge moving-players tempered-tiles))
-;;         moves-made (+ (moves-made bridge new-bridge) (:moves-made state))
-;;         time-left (- total-time current-tick)
-;;         ;; who died this tick
-;;         dead-players (deceased-players bridge new-bridge)
-;;         ;; THIS WILL BREAK - update the platform and the bridge entirely before doing this.
-;;         num-active-players (+ (count platform) (remove nil? (vals new-bridge)))
-;;         ;; update common cooperation
-;;         new-common-cooperation (new-common-cooperation old-common-cooperation moves-made current-tick)
-;;         ;; update chance of death
-;;         new-chance-of-death (new-chance-of-death old-chance-of-death time-left num-active-players)
-;;         ;; update jump misfortune
-;;         new-jump-misfortune (new-jump-misfortune (count dead-players) moves-made)
-;;         ;; survivors 
-;;         survivors (val (last new-bridge))
-;;         ;; jumped off the platform
-;;         jumpers (most-willing-player platform moving-players)]
-;;     ))
+(defn new-common-knowledge [common-knowledge tempered-tiles old-bridge new-bridge delta-dead-players]
+  ;; Common knowledge is mined if somebody pioneers a new step.
+  ;; Somebody must have mined a new step if there are new deaths or change in leading step
+  (let [taken-tile #(->> % 
+                        (filter (comp some? val))
+                        (into (sorted-map))
+                        (last)
+                        (key))
+        delta-leading-step (< (taken-tile old-bridge) (taken-tile new-bridge))]
+    (if (or delta-leading-step (pos? delta-dead-players))
+      ;; append to common-knowledge
+      (assoc 
+        common-knowledge 
+        (select-keys tempered-tiles (inc (key (last common-knowledge)))))
+      common-knowledge)))
 
-(defn tick [state]
-
-)
+(defn update-state [state moving-players tempered-tiles total-time]
+  (let [bridge 
+          (move-on-bridge (:bridge state) moving-players tempered-tiles (:common-knowledge state))
+        [new-platform new-bridge] 
+          (jump-off-platform (:platform state) bridge moving-players)
+        new-dead-players 
+          (deceased-players (:bridge state) new-bridge (:dead-players state))
+        new-survivors 
+          (cond-> (:survivors state) 
+            (val (last new-bridge)) (conj (val (last new-bridge))))
+        new-common-knowledge 
+          (new-common-knowledge
+            (:common-knowledge state)
+            tempered-tiles
+            (:bridge state) 
+            new-bridge 
+            (- (count new-dead-players) (count (:dead-players state))))
+        new-tick (inc (:tick state))
+        new-moves-made 
+          (+ (moves-made (:bridge bridge) new-bridge) (:moves-made state))
+        time-left (- total-time (:tick state))
+        num-active-players
+          (+ (count (:platform state)) (remove nil? (vals new-bridge)))
+        new-chance-of-death
+          (new-chance-of-death (:chance-of-death state) time-left num-active-players)
+        new-jump-misfortune
+          (util/zero-div (count new-dead-players) new-moves-made)
+        new-common-cooperation
+          (new-common-cooperation (:common-cooperation state) new-moves-made new-tick)]
+    (->State 
+      new-platform 
+      new-bridge 
+      new-dead-players 
+      new-survivors 
+      new-common-knowledge 
+      new-tick 
+      new-moves-made
+      new-chance-of-death
+      new-jump-misfortune
+      new-common-cooperation)))
 
 ;; (defn start-simulation [state]
 ;;   (while (and (< (:tick @state) (:timer @state))
