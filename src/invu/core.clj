@@ -74,10 +74,7 @@
       (reverse
         (reduce-kv
           (fn [acc-bridge step player]
-            (let [last-step
-                    (key (last acc-bridge))
-                  last-player 
-                    (val (last acc-bridge))
+            (let [[last-step last-player] (last acc-bridge)
                   tile-available
                     (or (= step final-step) (nil? last-player))
                   is-willing 
@@ -202,6 +199,9 @@
       new-chance-of-death
       new-jump-misfortune
       new-common-cooperation)))
+
+(defn tick []
+  )
 
 ;; (defn start-simulation [state]
 ;;   (while (and (< (:tick @state) (:timer @state))
