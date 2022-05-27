@@ -217,8 +217,14 @@
       new-jump-misfortune
       new-common-cooperation)))
 
-(defn tick []
-  )
+(defn delta-stats [old-state new-state]
+  "Tuple of delta-common-cooperation, delta-chance-of-death, delta-jump-misfortune"
+  [(- (:common-cooperation new-state) (:common-cooperation old-state))
+   (- (:chance-of-death new-state) (:chance-of-death old-state))
+   (- (:jump-misfortune new-state) (:jump-misfortune old-state))])
+
+;; (defn update-players [active-players ])
+
 
 ;; (defn start-simulation [state]
 ;;   (while (and (< (:tick @state) (:timer @state))
@@ -233,10 +239,9 @@
   ;;   (start-simulation new-state)
   ;;   (shutdown-agents))
   (let [all-players (id-to-players 7)
-        active-ids (set (take 5 (keys all-players)))
-        platform (set (take 3 active-ids))
-        moving-players (moving-players active-ids all-players {} 0.75)
-        state (init-state 5 5 all-players)]
+        state (init-state 5 5 all-players)
+        active-ids-loc (active-id->location state)
+        moving-players (moving-players active-ids-loc all-players {} 0.75 5)]
       (println state)
       (println "**************************************")
       (println (update-state state moving-players foo 5))

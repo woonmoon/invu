@@ -124,30 +124,23 @@
                 (and (pos? cooperation-desire) (pos? will-to-live-desire))
                     [(:id player) (+ cooperation-desire will-to-live-desire)])))
 
-    ;; (update-cooperation [player delta-common-cooperation]
-    ;;     (let [new-cooperation 
-    ;;             (util/reinforce-value 
-    ;;                 (:cooperation player) 
-    ;;                 delta-common-cooperation 
-    ;;                 0.2 
-    ;;                 0)]
-    ;;         (reset! (:cooperation player) new-cooperation)))
+    (update-cooperation [player delta-common-cooperation]
+        (util/reinforce-value 
+            (:cooperation player) 
+            delta-common-cooperation 
+            0.2 
+            0))
     
-    ;; (update-will-to-live [player delta-chance-of-death]
-    ;;     (let [new-will-to-live
-    ;;             (util/reinforce-value
-    ;;                 @(:will-to-live player)
-    ;;                 delta-chance-of-death
-    ;;                 0.2
-    ;;                 0)]
-    ;;         (reset! (:will-to-live player) new-will-to-live)))
+    (update-will-to-live [player delta-chance-of-death]
+        (util/reinforce-value
+            (:will-to-live player)
+            delta-chance-of-death
+            0.2
+            0))
             
-    ;; (update-aggression [player delta-jump-misfortune]
-    ;;     (let [new-aggression
-    ;;             (util/reinforce-value
-    ;;                 @(:aggression player)
-    ;;                 delta-jump-misfortune
-    ;;                 0.2
-    ;;                 0)]
-    ;;         (reset! (:aggression player) new-aggression)))
-            )
+    (update-aggression [player delta-jump-misfortune]
+        (util/reinforce-value
+            (:aggression player)
+            delta-jump-misfortune
+            0.2
+            0)))
