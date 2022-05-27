@@ -40,7 +40,7 @@
     })
 
 (defprotocol Player
-    (will-move [player common-knowledge common-cooperation])
+    (will-move [player next-step-known? common-cooperation])
     (move [player common-knowledge])
     (update-cooperation [player delta-common-cooperation])
     (update-will-to-live [player delta-chance-of-death])
@@ -91,8 +91,8 @@
 ;; Suppose you could record this data, how is a next population going to react/evolve.
 ;; Look at yourself and say classifier- what's going to happen to us?
 ;; Do we go ahead and do this or do we change?
-(defrecord Random [id location will-to-live aggression cooperation] Player
-    (will-move [player common-knowledge common-cooperation]
+(defrecord Random [id will-to-live aggression cooperation] Player
+    (will-move [player next-step-known? common-cooperation]
         (let 
             [fuzzy-cooperation 
                 (util/fuzzy-label cooperation-thresholds (:cooperation player))
@@ -107,7 +107,7 @@
              will-to-live-desire
                 (util/desire min-will-to-live (:will-to-live player))
              will-jump
-                (or (contains? common-knowledge (inc (:location player))) 
+                (or next-step-known?
                     (and (pos? cooperation-desire) (pos? will-to-live-desire)))]
             ;; Tragic, but not the top of my problems.
             (log/log :test-jump 
@@ -119,7 +119,7 @@
                 common-cooperation
                 will-jump)
             (cond
-                (contains? common-knowledge (inc (:location player))) 
+                next-step-known?
                     [(:id player) 1.0]
                 (and (pos? cooperation-desire) (pos? will-to-live-desire))
                     [(:id player) (+ cooperation-desire will-to-live-desire)])))

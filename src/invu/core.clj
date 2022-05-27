@@ -32,7 +32,7 @@
 
 (defn spawn-players [num-players]
   (repeatedly num-players 
-    #(players/->Random (gensym "Player") 0 (rand) (rand) (rand))))
+    #(players/->Random (gensym "Player") (rand) (rand) (rand))))
 
 (defn id-to-players [num-players]
   (->> (spawn-players num-players)
@@ -51,13 +51,22 @@
         players (set (keys id-to-players))]
     (->State players bridge #{} #{} {} 0 0 0 0 0.7)))
 
-(defn moving-players [active-ids id-to-players common-knowledge common-cooperation]
+(defn active-id->location [state]
+  (merge
+    (zipmap (:platform state) (repeat (count (:platform state)) 0))
+    (dissoc (set/map-invert (:bridge state)) nil)))
+
+(defn moving-players [active-ids-locations id-to-players common-knowledge common-cooperation final-step]
   "Returns a map of ids and desires of players who are willing to move"
-  (->> (select-keys id-to-players active-ids)
+  (let [active-ids (keys active-ids-locations)
+        next-step-known? #(or (contains? common-knowledge (inc %)) (= final-step %))]
+    (->> (select-keys id-to-players active-ids)
        vals
-       (map (fn [p] (players/will-move p common-knowledge common-cooperation)))
+       (map 
+          (fn [p] 
+            (players/will-move p (next-step-known? (get active-ids-locations (:id p))) common-cooperation)))
        (filter (comp some? second))
-       (into {})))
+       (into {}))))
 
 (defn most-willing-player [platform moving-players]
   "Returns the most willing player to jump off platform if nobody, returns nil."
@@ -69,28 +78,36 @@
 (defn move-on-bridge [bridge moving-players tempered-tiles common-knowledge]
   "Returns a tuple of [new-bridge, survivors] where new-bridge is sorted (ascending)"
   (let [final-step (last (keys bridge))
-        survivor-step (inc final-step)]
-    (into {}
-      (reverse
-        (reduce-kv
-          (fn [acc-bridge step player]
-            (let [[last-step last-player] (last acc-bridge)
-                  tile-available
-                    (or (= step final-step) (nil? last-player))
-                  is-willing 
-                    (contains? moving-players player)
-                  has-survived 
-                    (or (= (rand-int 2) (get tempered-tiles step))
-                        (contains? common-knowledge step))]
-              (cond
-                  (and is-willing tile-available has-survived)
-                      (assoc acc-bridge last-step player step nil)
-                  (and is-willing tile-available (not has-survived))
-                      (assoc acc-bridge last-step nil step nil)
-                  :else
-                      (assoc acc-bridge step player))))
-          (into (sorted-map-by >) {survivor-step nil})
-          (into (sorted-map-by >) bridge))))))
+        survivor-step (inc final-step)
+        tile-available? 
+          #(or (= %1 final-step) (nil? %2))
+        willing? 
+          #(contains? moving-players %)
+        survives? 
+          #(or (= (rand-int 2) (get tempered-tiles %)) (contains? common-knowledge %))
+        moves-forward-survives
+          #(assoc %1 %2 %3 %4 nil)
+        moves-forward-dies
+          #(assoc %1 %2 nil %3 nil)
+        does-not-move 
+          #(assoc %1 %2 %3)]
+    (into (sorted-map)
+      (reduce-kv
+        (fn [acc-bridge step player]
+          (let [[last-step last-player] (last acc-bridge)]
+            (cond
+                (and  (willing? player) 
+                      (tile-available? step last-player) 
+                      (survives? step))
+                  (moves-forward-survives acc-bridge last-step player step)
+                (and  (willing? player) 
+                      (tile-available? step last-player) 
+                      (not (survives? step)))
+                  (moves-forward-dies acc-bridge last-step step)
+                :else
+                  (does-not-move acc-bridge step player))))
+        (into (sorted-map-by >) {survivor-step nil})
+        (into (sorted-map-by >) bridge)))))
 
 (defn moves-made [old-bridge new-bridge]
   "Returns the number of moves made in the tick."
@@ -178,7 +195,7 @@
             (- (count new-dead-players) (count (:dead-players state))))
         new-tick (inc (:tick state))
         new-moves-made 
-          (+ (moves-made (:bridge bridge) new-bridge) (:moves-made state))
+          (+ (moves-made (:bridge state) new-bridge) (:moves-made state))
         time-left (- total-time (:tick state))
         num-active-players
           (+ (count (:platform state)) (count (remove nil? (vals new-bridge))))
