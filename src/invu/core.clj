@@ -180,13 +180,15 @@
 (defn update-state [state moving-players tempered-tiles total-time]
   (let [bridge 
           (move-on-bridge (:bridge state) moving-players tempered-tiles (:common-knowledge state))
-        [new-platform new-bridge] 
+        [new-platform temp-bridge] 
           (jump-off-platform (:platform state) bridge moving-players)
+        phantom-step (last temp-bridge)
+        new-bridge (dissoc temp-bridge (key phantom-step)) 
         new-dead-players 
           (deceased-players (:bridge state) new-bridge (:dead-players state))
         new-survivors 
           (cond-> (:survivors state) 
-            (val (last new-bridge)) (conj (val (last new-bridge))))
+            (val phantom-step) (conj (val phantom-step)))
         new-common-knowledge 
           (new-common-knowledge
             (:common-knowledge state)
@@ -206,9 +208,10 @@
           (util/zero-div (count new-dead-players) new-moves-made)
         new-common-cooperation
           (new-common-cooperation (:common-cooperation state) new-moves-made new-tick)]
+    ;; (println new-bridge)
     (->State 
       new-platform 
-      new-bridge 
+      new-bridge
       new-dead-players 
       new-survivors 
       new-common-knowledge 
