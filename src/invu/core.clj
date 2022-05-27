@@ -39,7 +39,7 @@
        (map (fn [p] [(.id p) p]))
        (into {})))
 
-(defn init-state [num-steps num-ticks id-to-players]
+(defn init-state [num-steps id-to-players]
   (let [num-entries (inc num-steps)
         bridge (zipmap 
                   (range 1 num-entries)
@@ -56,15 +56,16 @@
     (zipmap (:platform state) (repeat (count (:platform state)) 0))
     (dissoc (set/map-invert (:bridge state)) nil)))
 
-(defn moving-players [active-ids-locations id-to-players common-knowledge common-cooperation final-step]
+(defn moving-players [active-id->location id->player common-knowledge common-cooperation final-step]
   "Returns a map of ids and desires of players who are willing to move"
-  (let [active-ids (keys active-ids-locations)
+  (let [active-ids (keys active-id->location)
+        location #(get active-id->location (:id %))
         next-step-known? #(or (contains? common-knowledge (inc %)) (= final-step %))]
-    (->> (select-keys id-to-players active-ids)
+    (->> (select-keys id->player active-ids)
        vals
        (map 
           (fn [p] 
-            (players/will-move p (next-step-known? (get active-ids-locations (:id p))) common-cooperation)))
+            (players/will-move p (next-step-known? (location p)) common-cooperation)))
        (filter (comp some? second))
        (into {}))))
 
@@ -217,19 +218,45 @@
       new-jump-misfortune
       new-common-cooperation)))
 
-(defn delta-stats [old-state new-state]
-  "Tuple of delta-common-cooperation, delta-chance-of-death, delta-jump-misfortune"
-  [(- (:common-cooperation new-state) (:common-cooperation old-state))
-   (- (:chance-of-death new-state) (:chance-of-death old-state))
-   (- (:jump-misfortune new-state) (:jump-misfortune old-state))])
+(defn update-players [active-ids id->players old-state new-state]
+  (let [delta-cc (- (:common-cooperation new-state) (:common-cooperation old-state))
+        delta-cod (- (:chance-of-death new-state) (:chance-of-death old-state))
+        delta-jm (- (:jump-misfortune new-state) (:jump-misfortune old-state))
+        new-player #(players/->Random 
+                      (:id %)
+                      (players/update-will-to-live % delta-cod)
+                      (players/update-aggression % delta-jm)
+                      (players/update-cooperation % delta-cc))]
+    (reduce-kv
+      (fn [m id player] 
+        (assoc m id (new-player player))) 
+      {}
+      (select-keys id->players active-ids))))
 
-;; (defn update-players [active-players ])
+(defn tick [state id->player tempered-tiles total-time]
+  (let [active-id->location 
+          (active-id->location state)
+        moving-players 
+          (moving-players 
+            active-id->location 
+            id->player 
+            (:common-knowledge state) 
+            (:common-cooperation state)
+            (count tempered-tiles))
+        new-state 
+          (update-state state moving-players tempered-tiles total-time)
+        new-id->player
+          (update-players (keys active-id->location) id->player state new-state)]
+    [new-state new-id->player]))
 
-
-;; (defn start-simulation [state]
-;;   (while (and (< (:tick @state) (:timer @state))
-;;               (not (empty? (util/get-active-players state))))
-;;     (tick new-state)))
+(defn start-simulation [initial-state all-id->all-player tempered-tiles total-time]
+  (loop [state initial-state
+         id->player all-id->all-player]
+    (if (or (= (:tick state) total-time) (empty? id->player))
+      [state id->player]
+      (let [[new-state new-id->player] 
+              (tick state id->player tempered-tiles total-time)]
+        (recur new-state new-id->player)))))
 
 (defn -main [& args]
   ;; (let [config (edn/read-string (slurp "config.edn"))]
@@ -239,11 +266,9 @@
   ;;   (start-simulation new-state)
   ;;   (shutdown-agents))
   (let [all-players (id-to-players 7)
-        state (init-state 5 5 all-players)
-        active-ids-loc (active-id->location state)
-        moving-players (moving-players active-ids-loc all-players {} 0.75 5)]
+        state (init-state 5 all-players)
+        fin-state (start-simulation state all-players foo 5)]
       (println state)
-      (println "**************************************")
-      (println (update-state state moving-players foo 5))
-    )
+      (println "***************")
+      (println (first fin-state)))
 )
