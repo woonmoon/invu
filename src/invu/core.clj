@@ -78,6 +78,7 @@
 
 (defn move-on-bridge [bridge moving-players tempered-tiles common-knowledge]
   "Returns a tuple of [new-bridge, survivors] where new-bridge is sorted (ascending)"
+  (println "BRIDGE" bridge "CK" common-knowledge)
   (let [final-step (last (keys bridge))
         survivor-step (inc final-step)
         tile-available? 
@@ -85,7 +86,7 @@
         willing? 
           #(contains? moving-players %)
         survives? 
-          #(or (= (rand-int 2) (get tempered-tiles %)) (contains? common-knowledge %))
+          #(or (= (rand-int 2) (get tempered-tiles %1)) (contains? common-knowledge (inc %)))
         moves-forward-survives
           #(assoc %1 %2 %3 %4 nil)
         moves-forward-dies
@@ -208,7 +209,6 @@
           (util/zero-div (count new-dead-players) new-moves-made)
         new-common-cooperation
           (new-common-cooperation (:common-cooperation state) new-moves-made new-tick)]
-    ;; (println new-bridge)
     (->State 
       new-platform 
       new-bridge
@@ -237,6 +237,7 @@
       (select-keys id->players active-ids))))
 
 (defn tick [state id->player tempered-tiles total-time]
+  (println "********************")
   (let [active-id->location 
           (active-id->location state)
         moving-players 
