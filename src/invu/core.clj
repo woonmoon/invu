@@ -53,16 +53,17 @@
     (zipmap (:platform state) (repeat (count (:platform state)) 0))
     (dissoc (set/map-invert (:bridge state)) nil)))
 
-(defn moving-players [active-id->location id->player common-knowledge common-cooperation final-step]
+(defn moving-players 
+  [active-id->location id->player common-knowledge common-cooperation final-step chances-of-death]
   "Returns a map of ids and desires of players who are willing to move"
   (let [active-ids (keys active-id->location)
         location #(get active-id->location (:id %))
-        next-step-known? #(or (contains? common-knowledge (inc %)) (= final-step %))]
+        next-step-known? #(or (contains? common-knowledge (inc %)) (= final-step %))
+        panic? (and (apply < chances-of-death) (> (last chances-of-death) 0.5))]
     (->> (select-keys id->player active-ids)
        vals
        (map 
-          (fn [p] 
-            (players/will-move p (next-step-known? (location p)) common-cooperation)))
+          #(players/will-move % common-cooperation (next-step-known? (location %)) panic?))
        (filter (comp some? second))
        (into {}))))
 
@@ -245,7 +246,8 @@
             id->player 
             (:common-knowledge state) 
             (:common-cooperation state)
-            (count tempered-tiles))
+            (count tempered-tiles)
+            (:chance-of-death state))
         new-state 
           (update-state state moving-players tempered-tiles total-time)
         new-id->player
@@ -271,10 +273,10 @@
   ;;   (log/log :log-state new-state)
   ;;   (start-simulation new-state)
   ;;   (shutdown-agents))
-  (let [all-players (id-to-players 100)
-        state (init-state 100 all-players)
-        tempered-tiles (init-tempered-tiles 100)
-        fin-state (simulate state all-players tempered-tiles 100)]
+  (let [all-players (id-to-players 10)
+        state (init-state 10 all-players)
+        tempered-tiles (init-tempered-tiles 10)
+        fin-state (simulate state all-players tempered-tiles 10)]
       (println state)
       (println "***************")
       (println (first fin-state)))

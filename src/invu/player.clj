@@ -3,7 +3,7 @@
         [invu.util :as util]
         [invu.logger :as log]))
 
-(defonce cooperation-thresholds
+(defonce fuzzy-thresholds
     {
         0.2 :VLO
         0.4 :LO
@@ -12,16 +12,7 @@
         1.0 :VHI
     })
 
-(defonce aggression-thresholds
-    {
-        0.2 :VLO
-        0.4 :LO
-        0.6 :MID
-        0.8 :HI
-        1.0 :VHI
-    })
-
-(defonce cooperation-to-min-common-cooperation
+(defonce cooperation->min-common-cooperation
     {
         :VLO    0.8
         :LO     0.7
@@ -30,7 +21,7 @@
         :VHI    0.4
     })
 
-(defonce aggression-to-min-will-to-live
+(defonce aggression->min-will-to-live
     {
         :VLO    0.1
         :LO     0.2
@@ -40,7 +31,7 @@
     })
 
 (defprotocol Player
-    (will-move [player next-step-known? common-cooperation])
+    (will-move [player common-cooperation next-step-known? panic?])
     (move [player common-knowledge])
     (update-cooperation [player delta-common-cooperation])
     (update-will-to-live [player delta-chance-of-death])
@@ -92,37 +83,27 @@
 ;; Look at yourself and say classifier- what's going to happen to us?
 ;; Do we go ahead and do this or do we change?
 (defrecord Random [id will-to-live aggression cooperation] Player
-    (will-move [player next-step-known? common-cooperation]
+    (will-move [player common-cooperation next-step-known? panic?]
         (let 
             [fuzzy-cooperation 
-                (util/fuzzy-label cooperation-thresholds (:cooperation player))
+                (util/fuzzy-label fuzzy-thresholds (:cooperation player))
              fuzzy-aggression 
-                (util/fuzzy-label aggression-thresholds (:aggression player))
+                (util/fuzzy-label fuzzy-thresholds (:aggression player))
              min-common-cooperation
-                (get cooperation-to-min-common-cooperation fuzzy-cooperation)
+                (fuzzy-cooperation cooperation->min-common-cooperation)
              min-will-to-live
-                (get aggression-to-min-will-to-live fuzzy-aggression)
+                (fuzzy-aggression aggression->min-will-to-live)
              cooperation-desire 
                 (util/desire min-common-cooperation common-cooperation)
              will-to-live-desire
-                (util/desire min-will-to-live (:will-to-live player))
-             will-jump
-                (or next-step-known?
-                    (and (pos? cooperation-desire) (pos? will-to-live-desire)))]
-            ;; Tragic, but not the top of my problems.
-            (log/log :test-jump 
-                player
-                fuzzy-cooperation
-                fuzzy-aggression
-                cooperation-desire
-                will-to-live-desire
-                common-cooperation
-                will-jump)
+                (util/desire min-will-to-live (:will-to-live player))]
             (cond
                 next-step-known?
                     [(:id player) 1.0]
                 (and (pos? cooperation-desire) (pos? will-to-live-desire))
-                    [(:id player) (+ cooperation-desire will-to-live-desire)])))
+                    [(:id player) (+ cooperation-desire will-to-live-desire)]
+                (and panic? (zero? (rand-int 1)))
+                    [(:id player) 0.5])))
 
     (update-cooperation [player delta-common-cooperation]
         (util/reinforce-value 
