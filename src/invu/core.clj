@@ -46,7 +46,7 @@
                             (range 1 num-entries)
                             (take num-steps (repeatedly #(rand-int 2)))))
         players (set (keys id-to-players))]
-    (->State players bridge #{} #{} {} 0 0 0 0 0.7)))
+    (->State players bridge #{} #{} {} 0 0 [0] 0 0.7)))
 
 (defn active-id->location [state]
   (merge
@@ -138,11 +138,13 @@
 ;; if (active-players - ticks-left) = 0:
 ;; ==> chance-of-death = 0
 ;; TODO: Implement a panic that kicks in at consecutive number of delta increasing.
-(defn new-chance-of-death [old-chance-of-death time-left num-active-players]
-  (let [players-to-die (- num-active-players time-left)]
-    (if (neg? players-to-die) 
-      0 
-      (util/one-div players-to-die num-active-players))))
+(defn new-chance-of-death [prev-chances time-left num-active-players]
+  (let [players-to-die (- num-active-players time-left)
+        new-chance-of-death (if (neg? players-to-die) 
+                              0 
+                              (util/one-div players-to-die num-active-players))]
+    (cond->> (conj prev-chances new-chance-of-death)
+      (> (count prev-chances) 2) (drop 1))))
 
 (defn jump-off-platform [platform bridge moving-players]
   (let [brave-player (most-willing-player platform moving-players)]
@@ -218,14 +220,16 @@
       new-common-cooperation)))
 
 (defn update-players [active-ids id->players old-state new-state]
-  (let [delta-cc (- (:common-cooperation new-state) (:common-cooperation old-state))
-        delta-cod (- (:chance-of-death new-state) (:chance-of-death old-state))
-        delta-jm (- (:jump-misfortune new-state) (:jump-misfortune old-state))
+  (let [deltas 
+          (apply mapv - 
+            (map 
+              (juxt :common-cooperation (comp last :chance-of-death) :jump-misfortune) 
+              [new-state old-state]))
         new-player #(players/->Random 
                       (:id %)
-                      (players/update-will-to-live % delta-cod)
-                      (players/update-aggression % delta-jm)
-                      (players/update-cooperation % delta-cc))]
+                      (players/update-will-to-live % (first deltas))
+                      (players/update-aggression % (second deltas))
+                      (players/update-cooperation % (nth deltas 2)))]
     (reduce-kv
       (fn [m id player] 
         (assoc m id (new-player player))) 
