@@ -78,7 +78,6 @@
 
 (defn move-on-bridge [bridge moving-players tempered-tiles common-knowledge]
   "Returns a tuple of [new-bridge, survivors] where new-bridge is sorted (ascending)"
-  (println "BRIDGE" bridge "CK" common-knowledge)
   (let [final-step (last (keys bridge))
         survivor-step (inc final-step)
         tile-available? 
@@ -169,7 +168,7 @@
                         (last))] 
                 (first max-tile)
                 0))
-          delta-leading-step (< (leading-tile old-bridge) (leading-tile new-bridge))
+          delta-leading-step (< (count common-knowledge) (leading-tile new-bridge))
           next-step (inc (count common-knowledge))]
       (if (or delta-leading-step (pos? delta-deaths))
         (assoc 
@@ -237,7 +236,6 @@
       (select-keys id->players active-ids))))
 
 (defn tick [state id->player tempered-tiles total-time]
-  (println "********************")
   (let [active-id->location 
           (active-id->location state)
         moving-players 
@@ -253,7 +251,7 @@
           (update-players (keys active-id->location) id->player state new-state)]
     [new-state new-id->player]))
 
-(defn start-simulation [initial-state all-id->all-player tempered-tiles total-time]
+(defn simulation [initial-state all-id->all-player tempered-tiles total-time]
   (loop [state initial-state
          id->player all-id->all-player]
     (if (or (= (:tick state) total-time) (empty? id->player))
@@ -262,6 +260,9 @@
               (tick state id->player tempered-tiles total-time)]
         (recur new-state new-id->player)))))
 
+;; (defn parse-config [config]
+;;   (let [configuration]))
+
 (defn -main [& args]
   ;; (let [config (edn/read-string (slurp "config.edn"))]
   ;;   (init-state new-state (:num-steps config) (:num-ticks config))
@@ -269,9 +270,9 @@
   ;;   (log/log :log-state new-state)
   ;;   (start-simulation new-state)
   ;;   (shutdown-agents))
-  (let [all-players (id-to-players 7)
+  (let [all-players (id-to-players 5)
         state (init-state 5 all-players)
-        fin-state (start-simulation state all-players foo 5)]
+        fin-state (simulation state all-players foo 10)]
       (println state)
       (println "***************")
       (println (first fin-state)))
