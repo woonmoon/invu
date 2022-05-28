@@ -38,9 +38,10 @@
 
 (defn init-state [num-steps id-to-players]
   (let [num-entries (inc num-steps)
-        bridge (zipmap 
+        bridge (into (sorted-map)
+                (zipmap 
                   (range 1 num-entries)
-                  (take num-steps (repeat nil)))
+                  (take num-steps (repeat nil))))
         tempered-steps (into (sorted-map)
                           (zipmap
                             (range 1 num-entries)
@@ -110,6 +111,8 @@
 
 (defn moves-made [old-bridge new-bridge]
   "Returns the number of moves made in the tick."
+  (println "old" old-bridge)
+  (println "new" new-bridge)
 ;; NOTE(woonmoon): This works because each player maps onto a step and 
 ;; the only reason a mapping would have changed is if the player moved.
   (let [old-players (dissoc (set/map-invert old-bridge) nil)
@@ -183,7 +186,7 @@
         [new-platform temp-bridge] 
           (jump-off-platform (:platform state) bridge moving-players)
         phantom-step (last temp-bridge)
-        new-bridge (dissoc temp-bridge (key phantom-step)) 
+        new-bridge (into (sorted-map) (dissoc temp-bridge (key phantom-step))) 
         new-dead-players 
           (deceased-players (:bridge state) new-bridge (:dead-players state))
         new-survivors 
@@ -208,6 +211,8 @@
           (util/zero-div (count new-dead-players) new-moves-made)
         new-common-cooperation
           (new-common-cooperation (:common-cooperation state) new-moves-made new-tick)]
+    (println "moves made" new-moves-made)
+    (println "******************")
     (->State 
       new-platform 
       new-bridge
@@ -265,7 +270,8 @@
 
 ;; (defn parse-config [config]
 ;;   (let [configuration]))
-
+;; Ask Professor if the moves-made metric has any meaning since 
+;; once the pioneer goes everyone else just follows.
 (defn -main [& args]
   ;; (let [config (edn/read-string (slurp "config.edn"))]
   ;;   (init-state new-state (:num-steps config) (:num-ticks config))
@@ -273,9 +279,9 @@
   ;;   (log/log :log-state new-state)
   ;;   (start-simulation new-state)
   ;;   (shutdown-agents))
-  (let [all-players (id-to-players 10)
+  (let [all-players (id-to-players 5)
         state (init-state 10 all-players)
-        tempered-tiles (init-tempered-tiles 10)
+        tempered-tiles (init-tempered-tiles 5)
         fin-state (simulate state all-players tempered-tiles 10)]
       (println state)
       (println "***************")
