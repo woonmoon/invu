@@ -109,18 +109,30 @@
         (into (sorted-map-by >) {survivor-step nil})
         (into (sorted-map-by >) bridge)))))
 
+;; (defn bar [difference]
+;;   (let [players (->> (butlast difference)
+;;                       (map (comp set keys))
+;;                       (apply set/union))]
+;;       (-> players
+;;           (disj nil)
+;;           (count))))
+      
 (defn moves-made [old-bridge new-bridge]
   "Returns the number of moves made in the tick."
-  (println "old" old-bridge)
-  (println "new" new-bridge)
+  (println "old bridge" old-bridge)
+  (println "new bridge" new-bridge)
 ;; NOTE(woonmoon): This works because each player maps onto a step and 
 ;; the only reason a mapping would have changed is if the player moved.
-  (let [old-players (dissoc (set/map-invert old-bridge) nil)
-        new-players (dissoc (set/map-invert new-bridge) nil)
-        difference (data/diff old-players new-players)]
-    (-> (map keys (drop-last difference))
-        flatten
-        count)))
+  (let [find-players #(-> % (set/map-invert) (dissoc nil))
+        all-players (->> [old-bridge new-bridge]
+                      (map find-players)
+                      (apply data/diff)
+                      butlast
+                      (map (comp set keys))
+                      (apply set/union))]
+    (-> all-players
+      (disj nil)
+      (count))))
 
 (defn deceased-players [old-bridge new-bridge already-dead]
   (let [players #(-> % vals set (disj nil))]
