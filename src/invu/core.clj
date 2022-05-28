@@ -8,13 +8,10 @@
             [clojure.edn :as edn])
   (:gen-class))
 
-(def foo {
-  1 1
-  2 0
-  3 0
-  4 0
-  5 1
-})
+(defn init-tempered-tiles [num-steps]
+  (zipmap
+    (range 1 (inc num-steps))
+    (repeatedly num-steps #(rand-int 2))))
 
 (defrecord State
   [
@@ -251,7 +248,7 @@
           (update-players (keys active-id->location) id->player state new-state)]
     [new-state new-id->player]))
 
-(defn simulation [initial-state all-id->all-player tempered-tiles total-time]
+(defn simulate [initial-state all-id->all-player tempered-tiles total-time]
   (loop [state initial-state
          id->player all-id->all-player]
     (if (or (= (:tick state) total-time) (empty? id->player))
@@ -270,9 +267,10 @@
   ;;   (log/log :log-state new-state)
   ;;   (start-simulation new-state)
   ;;   (shutdown-agents))
-  (let [all-players (id-to-players 5)
-        state (init-state 5 all-players)
-        fin-state (simulation state all-players foo 10)]
+  (let [all-players (id-to-players 100)
+        state (init-state 100 all-players)
+        tempered-tiles (init-tempered-tiles 100)
+        fin-state (simulate state all-players tempered-tiles 100)]
       (println state)
       (println "***************")
       (println (first fin-state)))
