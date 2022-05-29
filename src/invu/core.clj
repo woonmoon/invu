@@ -175,9 +175,10 @@
                         (last))] 
                 (first max-tile)
                 0))
-          delta-leading-step (< (count common-knowledge) (leading-tile new-bridge))
+          leading-tiles (map leading-tile [old-bridge new-bridge])
+          leading-players (map get [old-bridge new-bridge] leading-tiles)
           next-step (inc (count common-knowledge))]
-      (if (or delta-leading-step (pos? delta-deaths))
+      (if (or (apply < leading-tiles) (apply not= leading-players))
         (assoc 
           common-knowledge
           next-step
