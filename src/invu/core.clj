@@ -27,12 +27,13 @@
     common-cooperation
   ])
 
-(defn spawn-players [num-players]
+(defn spawn-players [num-players player-ratios] 
+  {:pre [(= 1.0M (->> player-ratios vals (map bigdec) (apply +)))]}
   (repeatedly num-players 
     #(players/->Random (gensym "Player") (rand) (rand) (rand))))
 
-(defn id-to-players [num-players]
-  (->> (spawn-players num-players)
+(defn id-to-players [num-players player-ratios]
+  (->> (spawn-players num-players player-ratios)
        (map (fn [p] [(.id p) p]))
        (into {})))
 
@@ -160,7 +161,8 @@
       [(disj platform brave-player) (assoc bridge 1 brave-player)]
       [platform bridge])))
 
-(defn new-common-knowledge [common-knowledge tempered-tiles old-bridge new-bridge delta-deaths]
+(defn new-common-knowledge 
+  [common-knowledge tempered-tiles old-bridge new-bridge delta-deaths]
   ;; Common knowledge is mined if somebody pioneers a new step.
   ;; Somebody must have mined a new step if there are new deaths or change in leading step
   (if (= common-knowledge tempered-tiles)
@@ -178,9 +180,6 @@
           leading-tiles (map leading-tile [old-bridge new-bridge])
           leading-players (map get [old-bridge new-bridge] leading-tiles)
           next-step (inc (count common-knowledge))]
-      ;; (println "LEADING TILES" leading-tiles)
-      ;; (println "LEADING PLAYERS" leading-players)
-      ;; (println "BRIDGE" new-bridge)
       (if (or (apply < leading-tiles) (apply not= leading-players))
         (assoc 
           common-knowledge
@@ -296,9 +295,17 @@
         num-steps (:num-steps config)
         num-ticks (:num-ticks config)
         tempered-tiles (:tempered-tiles config)
-        initial-players (id-to-players num-players)
+        player-ratios 
+          (select-keys 
+            config 
+            [:uncooperative-aggressive 
+             :uncooperative-unaggressive
+             :cooperative-aggressive
+             :cooperative-unaggressive])
+        initial-players (id-to-players num-players player-ratios)
         initial-state (init-state num-steps initial-players)
         final-output 
-          (simulate initial-state initial-players tempered-tiles num-ticks)]
+          (simulate initial-state initial-players tempered-tiles num-ticks)
+        ]
     (fmt-output final-output)
     (shutdown-agents)))

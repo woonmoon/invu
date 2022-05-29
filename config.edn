@@ -2,4 +2,8 @@
     :num-players 5
     :num-steps 5
     :num-ticks 5
+    :uncooperative-aggressive 0.2
+    :uncooperative-unaggressive 0.4
+    :cooperative-aggressive 0.3
+    :cooperative-unaggressive 0.1
 }
