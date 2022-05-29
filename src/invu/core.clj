@@ -3,12 +3,12 @@
             [clojure.data :as data]
             [invu.util :as util]
             [invu.player :as players]
-            [invu.logger :as log]
+            [clojure.pprint :as pp]
             [clojure.java.io :as io]
             [clojure.edn :as edn])
   (:gen-class))
 
-(defn init-tempered-tiles [num-steps]
+(defn generate-tempered-tiles [num-steps]
   (zipmap
     (range 1 (inc num-steps))
     (repeatedly num-steps #(rand-int 2))))
@@ -178,6 +178,9 @@
           leading-tiles (map leading-tile [old-bridge new-bridge])
           leading-players (map get [old-bridge new-bridge] leading-tiles)
           next-step (inc (count common-knowledge))]
+      ;; (println "LEADING TILES" leading-tiles)
+      ;; (println "LEADING PLAYERS" leading-players)
+      ;; (println "BRIDGE" new-bridge)
       (if (or (apply < leading-tiles) (apply not= leading-players))
         (assoc 
           common-knowledge
@@ -271,23 +274,26 @@
               (tick state id->player tempered-tiles total-time)]
         (recur new-state new-id->player)))))
 
-;; (defn parse-config [config]
-;;   (let [configuration]))
+(defn parse-config [config-file]
+  (let [user-def-config (edn/read-string (slurp config-file))
+        tempered-tiles (generate-tempered-tiles (:num-steps user-def-config))]
+    (assoc user-def-config :tempered-tiles tempered-tiles)))
+
+(defn fmt-output [[final-state final-players]]
+  (let [output (merge final-state final-players)]
+    (spit "output.edn" (with-out-str (pp/pprint output)))))
 
 ;; Ask Professor if the moves-made metric has any meaning since 
 ;; once the pioneer goes everyone else just follows.
 (defn -main [& args]
-  ;; (let [config (edn/read-string (slurp "config.edn"))]
-  ;;   (init-state new-state (:num-steps config) (:num-ticks config))
-  ;;   (spawn-players new-state (:num-players config))
-  ;;   (log/log :log-state new-state)
-  ;;   (start-simulation new-state)
-  ;;   (shutdown-agents))
-  (let [all-players (id-to-players 5)
-        state (init-state 10 all-players)
-        tempered-tiles (init-tempered-tiles 5)
-        fin-state (simulate state all-players tempered-tiles 10)]
-      (println state)
-      (println "***************")
-      (println (first fin-state)))
-)
+  (let [config (parse-config "config.edn")
+        num-players (:num-players config)
+        num-steps (:num-steps config)
+        num-ticks (:num-ticks config)
+        tempered-tiles (:tempered-tiles config)
+        initial-players (id-to-players num-players)
+        initial-state (init-state num-steps initial-players)
+        final-output 
+          (simulate initial-state initial-players tempered-tiles num-ticks)]
+    (fmt-output final-output)
+    (shutdown-agents)))
