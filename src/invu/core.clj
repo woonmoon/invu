@@ -4,7 +4,8 @@
             [invu.util :as util]
             [invu.player :as players]
             [clojure.pprint :as pp]
-            [clojure.java.io :as io]
+            [clojure.math :as math]
+            [clojure.string :as str]
             [clojure.edn :as edn])
   (:gen-class))
 
@@ -27,15 +28,39 @@
     common-cooperation
   ])
 
-(defn spawn-players [num-players player-ratios] 
-  {:pre [(= 1.0M (->> player-ratios vals (map bigdec) (apply +)))]}
-  (repeatedly num-players 
-    #(players/->Random (gensym "Player") (rand) (rand) (rand))))
+;; The most over-engineered thing I've ever written.
+(defn gen-player-stats [player-type]
+  "Returns a tuple of cooperation and aggression"
+  {:pre 
+    [(some #{player-type} 
+      '(:uncooperative-aggressive 
+        :uncooperative-unaggressive 
+        :cooperative-aggressive 
+        :cooperative-unaggressive))]}
+  (map 
+    (fn [label] 
+      (if (str/starts-with? label "un")
+          (util/rand-range 0.0 0.5)
+          (util/rand-range 0.5 1.0))) 
+    (str/split (name player-type) #"-")))
 
-(defn id-to-players [num-players player-ratios]
-  (->> (spawn-players num-players player-ratios)
+(defn spawn-players [[player-type num-players]]
+  (map
+    #(players/->Random (gensym "Player") (rand) (first %) (second %))
+    (repeatedly num-players #(gen-player-stats player-type))))
+
+(defn id-to-players [num-total-players player-ratios]
+  {:pre [(= 1.0M (->> player-ratios vals (map bigdec) (apply +)))]}
+  (let 
+    [player-type-population
+      (reduce-kv
+        (fn [m player-type ratio]
+          (assoc m player-type (math/round (* ratio num-total-players))))
+          {}
+          player-ratios)]
+  (->> (mapcat spawn-players player-type-population)
        (map (fn [p] [(.id p) p]))
-       (into {})))
+       (into {}))))
 
 (defn init-state [num-steps id-to-players]
   (let [num-entries (inc num-steps)

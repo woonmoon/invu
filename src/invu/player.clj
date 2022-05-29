@@ -82,7 +82,7 @@
 ;; Suppose you could record this data, how is a next population going to react/evolve.
 ;; Look at yourself and say classifier- what's going to happen to us?
 ;; Do we go ahead and do this or do we change?
-(defrecord Random [id will-to-live aggression cooperation] Player
+(defrecord Random [id will-to-live cooperation aggression] Player
     (will-move [player common-cooperation next-step-known? panic?]
         (let 
             [fuzzy-cooperation 

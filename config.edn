@@ -1,7 +1,7 @@
 {
-    :num-players 5
-    :num-steps 5
-    :num-ticks 5
+    :num-players 100
+    :num-steps 100
+    :num-ticks 100
     :uncooperative-aggressive 0.2
     :uncooperative-unaggressive 0.4
     :cooperative-aggressive 0.3
