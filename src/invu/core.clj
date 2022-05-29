@@ -9,7 +9,7 @@
             [clojure.edn :as edn])
   (:gen-class))
 
-(defn generate-tempered-tiles [num-steps]
+(defn gen-tempered-tiles [num-steps]
   (zipmap
     (range 1 (inc num-steps))
     (repeatedly num-steps #(rand-int 2))))
@@ -58,7 +58,8 @@
           (assoc m player-type (math/round (* ratio num-total-players))))
           {}
           player-ratios)]
-  (->> (mapcat spawn-players player-type-population)
+  (->> player-type-population
+       (mapcat spawn-players)
        (map (fn [p] [(.id p) p]))
        (into {}))))
 
@@ -300,7 +301,7 @@
 
 (defn parse-config [config-file]
   (let [user-def-config (edn/read-string (slurp config-file))
-        tempered-tiles (generate-tempered-tiles (:num-steps user-def-config))]
+        tempered-tiles (gen-tempered-tiles (:num-steps user-def-config))]
     (assoc user-def-config :tempered-tiles tempered-tiles)))
 
 (defn fmt-output [[final-state final-players]]
