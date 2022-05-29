@@ -109,18 +109,8 @@
         (into (sorted-map-by >) {survivor-step nil})
         (into (sorted-map-by >) bridge)))))
 
-;; (defn bar [difference]
-;;   (let [players (->> (butlast difference)
-;;                       (map (comp set keys))
-;;                       (apply set/union))]
-;;       (-> players
-;;           (disj nil)
-;;           (count))))
-      
 (defn moves-made [old-bridge new-bridge]
   "Returns the number of moves made in the tick."
-  (println "old bridge" old-bridge)
-  (println "new bridge" new-bridge)
 ;; NOTE(woonmoon): This works because each player maps onto a step and 
 ;; the only reason a mapping would have changed is if the player moved.
   (let [find-players #(-> % (set/map-invert) (dissoc nil))
@@ -135,8 +125,10 @@
       (count))))
 
 (defn deceased-players [old-bridge new-bridge already-dead]
-  (let [players #(-> % vals set (disj nil))]
-    (if-let [dead (seq (first (data/diff (players old-bridge) (players new-bridge))))]
+  (let [players #(-> % vals set (disj nil))
+        players-difference 
+          (->> [old-bridge new-bridge] (map players) (apply data/diff))]
+    (if-let [dead (-> players-difference first seq)]
       (set (concat (seq already-dead) dead))
       already-dead)))
 
@@ -223,8 +215,6 @@
           (util/zero-div (count new-dead-players) new-moves-made)
         new-common-cooperation
           (new-common-cooperation (:common-cooperation state) new-moves-made new-tick)]
-    (println "moves made" new-moves-made)
-    (println "******************")
     (->State 
       new-platform 
       new-bridge
@@ -282,6 +272,7 @@
 
 ;; (defn parse-config [config]
 ;;   (let [configuration]))
+
 ;; Ask Professor if the moves-made metric has any meaning since 
 ;; once the pioneer goes everyone else just follows.
 (defn -main [& args]
