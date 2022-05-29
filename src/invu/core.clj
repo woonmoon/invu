@@ -280,7 +280,12 @@
     (assoc user-def-config :tempered-tiles tempered-tiles)))
 
 (defn fmt-output [[final-state final-players]]
-  (let [output (merge final-state final-players)]
+  (let [output {
+          :num-survivors (count (:survivors final-state))
+          :num-deceased (+ (count final-players) (count (:dead-players final-state)))
+          :common-knowledge (:common-knowledge final-state)
+          :final-player-state final-players
+        }]
     (spit "output.edn" (with-out-str (pp/pprint output)))))
 
 ;; Ask Professor if the moves-made metric has any meaning since 
