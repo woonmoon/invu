@@ -30,13 +30,9 @@
 
 (defonce initial-inactive-players {
   :surviving-players 
-      {
-          0 nil
-      }
+      { 0 nil }
   :dead-players
-      {
-          0 nil
-      }
+      { 0 nil }
 })
 
 ;; The most over-engineered thing I've ever written.
@@ -317,9 +313,10 @@
           (:chance-of-death final-state)
           (:jump-misfortune final-state)
           (:common-cooperation final-state))
-        (assoc-in final-player-state [:dead-players :timeout] (seq all-dead))]))
+        (assoc-in final-player-state [:dead-players :timeout] (seq eliminated))]))
 
 (defn tick [state id->player inactive-players tempered-tiles total-time]
+  (println state)
   (let [active-id->location 
           (active-id->location state)
         active-players
@@ -354,8 +351,10 @@
          id->player all-id->all-player
          inactive-players initial-inactive-players]
     (cond
-      (empty? id->player) [state inactive-players]
-      (= (:tick state) total-time) (eliminate-remaining state inactive-players)
+      (empty? id->player) 
+        [state inactive-players]
+      (= (:tick state) total-time) 
+        (eliminate-remaining state inactive-players)
       :else
         (let [[new-state new-id->player new-inactive-players] 
           (tick state id->player inactive-players tempered-tiles total-time)]
@@ -398,8 +397,7 @@
             initial-players 
             initial-inactive-players 
             tempered-tiles 
-            num-ticks)
-        ]
+            num-ticks)]
     ;; (println (last final-output))
     (fmt-output final-output)
     (shutdown-agents)))
