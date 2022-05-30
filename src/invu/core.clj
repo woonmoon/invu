@@ -297,6 +297,28 @@
     :dead-players (vals deceased)
   }))
 
+  (defn eliminate-remaining [final-state final-player-state]
+    ;; Move anyone on the platform and bridge to deceased players under :time-out
+    (let [eliminated (set/union (:platform final-state)
+                                (->> final-state
+                                    :bridge
+                                    vals
+                                    (remove nil?)
+                                    set))
+          all-dead (set/union eliminated (:dead-players final-state))]
+      [(->State 
+          #{} 
+          nil 
+          all-dead 
+          (:survivors final-state) 
+          (:common-knowledge final-state)
+          (:tick final-state)
+          (:moves-made final-state)
+          (:chance-of-death final-state)
+          (:jump-misfortune final-state)
+          (:common-cooperation final-state))
+        (assoc-in final-player-state [:dead-players :timeout] (seq all-dead))]))
+
 (defn tick [state id->player inactive-players tempered-tiles total-time]
   (let [active-id->location 
           (active-id->location state)
@@ -331,21 +353,23 @@
   (loop [state initial-state
          id->player all-id->all-player
          inactive-players initial-inactive-players]
-    (if (or (= (:tick state) total-time) (empty? id->player))
-      [state id->player inactive-players]
-      (let [[new-state new-id->player new-inactive-players] 
-              (tick state id->player inactive-players tempered-tiles total-time)]
-        (recur new-state new-id->player new-inactive-players)))))
+    (cond
+      (empty? id->player) [state inactive-players]
+      (= (:tick state) total-time) (eliminate-remaining state inactive-players)
+      :else
+        (let [[new-state new-id->player new-inactive-players] 
+          (tick state id->player inactive-players tempered-tiles total-time)]
+            (recur new-state new-id->player new-inactive-players)))))
 
 (defn parse-config [config-file]
   (let [user-def-config (edn/read-string (slurp config-file))
         tempered-tiles (gen-tempered-tiles (:num-steps user-def-config))]
     (assoc user-def-config :tempered-tiles tempered-tiles)))
 
-(defn fmt-output [[final-state final-players final-player-state]]
+(defn fmt-output [[final-state final-player-state]]
   (let [output {
           :num-survivors (count (:survivors final-state))
-          :num-deceased (+ (count final-players) (count (:dead-players final-state)))
+          :num-deceased "tbc"
           :common-knowledge (:common-knowledge final-state)
           :final-player-state final-player-state
         }]
