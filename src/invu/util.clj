@@ -7,6 +7,10 @@
 (defn rand-range [lower-bound upper-bound]
     (+ lower-bound (rand (- upper-bound lower-bound))))
 
+(defn split-map-by-keys [m keys]
+    "Returns tuple where first is the map with keys and the second is without."
+    [(select-keys m keys) (apply dissoc m keys)])
+
 (defmacro fuzzy-label [thresholds x]
     "Returns correct fuzzy label given thresholds and score x."
     `(let [ x# ~x

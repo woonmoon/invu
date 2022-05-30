@@ -28,6 +28,17 @@
     common-cooperation
   ])
 
+(defonce initial-inactive-players {
+  :surviving-players 
+      {
+          0 {}
+      }
+  :dead-players
+      {
+          0 {}
+      }
+})
+
 ;; The most over-engineered thing I've ever written.
 (defn gen-player-stats [player-type]
   "Returns a tuple of cooperation and aggression"
@@ -207,10 +218,11 @@
           leading-players (map get [old-bridge new-bridge] leading-tiles)
           next-step (inc (count common-knowledge))]
       (if (or (apply < leading-tiles) (apply not= leading-players))
-        (assoc 
-          common-knowledge
-          next-step
-          (get tempered-tiles next-step))
+        (into (sorted-map) 
+          (assoc 
+            common-knowledge
+            next-step
+            (get tempered-tiles next-step)))
         common-knowledge))))
 
 (defn update-state [state moving-players tempered-tiles total-time]
@@ -256,7 +268,7 @@
       new-jump-misfortune
       new-common-cooperation)))
 
-(defn update-players [active-ids id->players old-state new-state]
+(defn update-active-players [active-players old-state new-state]
   (let [deltas 
           (apply mapv - 
             (map 
@@ -271,11 +283,25 @@
       (fn [m id player] 
         (assoc m id (new-player player))) 
       {}
-      (select-keys id->players active-ids))))
+      active-players)))
 
-(defn tick [state id->player tempered-tiles total-time]
+(defn update-inactive-players [inactive-players survivors deceased curr-tick]
+  {:pre [(and (contains? inactive-players :surviving-players) 
+              (contains? inactive-players :dead-players))]}
+  (reduce-kv
+      (fn [m category players]
+          (assoc-in m [category curr-tick] players))
+  inactive-players
+  {
+    :surviving-players survivors 
+    :dead-players deceased
+  }))
+
+(defn tick [state id->player inactive-players tempered-tiles total-time]
   (let [active-id->location 
           (active-id->location state)
+        active-players
+          (select-keys id->player (keys active-id->location))
         moving-players 
           (moving-players 
             active-id->location 
@@ -287,17 +313,29 @@
         new-state 
           (update-state state moving-players tempered-tiles total-time)
         new-id->player
-          (update-players (keys active-id->location) id->player state new-state)]
-    [new-state new-id->player]))
+          (update-active-players active-players state new-state)
+        surviving-players
+          (select-keys id->player (:survivors new-state))
+        dead-players
+          (select-keys id->player (:dead-players new-state))
+        new-inactive-players
+          (update-inactive-players 
+            inactive-players
+            surviving-players 
+            dead-players 
+            (inc (:tick new-state)))]
+    [new-state new-id->player new-inactive-players]))
 
-(defn simulate [initial-state all-id->all-player tempered-tiles total-time]
+(defn simulate 
+  [initial-state all-id->all-player initial-inactive-players tempered-tiles total-time]
   (loop [state initial-state
-         id->player all-id->all-player]
+         id->player all-id->all-player
+         inactive-players initial-inactive-players]
     (if (or (= (:tick state) total-time) (empty? id->player))
       [state id->player]
-      (let [[new-state new-id->player] 
-              (tick state id->player tempered-tiles total-time)]
-        (recur new-state new-id->player)))))
+      (let [[new-state new-id->player new-inactive-players] 
+              (tick state id->player inactive-players tempered-tiles total-time)]
+        (recur new-state new-id->player new-inactive-players)))))
 
 (defn parse-config [config-file]
   (let [user-def-config (edn/read-string (slurp config-file))
@@ -331,7 +369,12 @@
         initial-players (id-to-players num-players player-ratios)
         initial-state (init-state num-steps initial-players)
         final-output 
-          (simulate initial-state initial-players tempered-tiles num-ticks)
+          (simulate 
+            initial-state 
+            initial-players 
+            initial-inactive-players 
+            tempered-tiles 
+            num-ticks)
         ]
     (fmt-output final-output)
     (shutdown-agents)))
