@@ -31,11 +31,11 @@
 (defonce initial-inactive-players {
   :surviving-players 
       {
-          0 {}
+          0 nil
       }
   :dead-players
       {
-          0 {}
+          0 nil
       }
 })
 
@@ -293,8 +293,8 @@
           (assoc-in m [category curr-tick] players))
   inactive-players
   {
-    :surviving-players survivors 
-    :dead-players deceased
+    :surviving-players (vals survivors) 
+    :dead-players (vals deceased)
   }))
 
 (defn tick [state id->player inactive-players tempered-tiles total-time]
@@ -323,7 +323,7 @@
             inactive-players
             surviving-players 
             dead-players 
-            (inc (:tick new-state)))]
+            (:tick new-state))]
     [new-state new-id->player new-inactive-players]))
 
 (defn simulate 
@@ -332,7 +332,7 @@
          id->player all-id->all-player
          inactive-players initial-inactive-players]
     (if (or (= (:tick state) total-time) (empty? id->player))
-      [state id->player]
+      [state id->player inactive-players]
       (let [[new-state new-id->player new-inactive-players] 
               (tick state id->player inactive-players tempered-tiles total-time)]
         (recur new-state new-id->player new-inactive-players)))))
@@ -342,12 +342,12 @@
         tempered-tiles (gen-tempered-tiles (:num-steps user-def-config))]
     (assoc user-def-config :tempered-tiles tempered-tiles)))
 
-(defn fmt-output [[final-state final-players]]
+(defn fmt-output [[final-state final-players final-player-state]]
   (let [output {
           :num-survivors (count (:survivors final-state))
           :num-deceased (+ (count final-players) (count (:dead-players final-state)))
           :common-knowledge (:common-knowledge final-state)
-          :final-player-state final-players
+          :final-player-state final-player-state
         }]
     (spit "output.edn" (with-out-str (pp/pprint output)))))
 
@@ -376,5 +376,6 @@
             tempered-tiles 
             num-ticks)
         ]
+    ;; (println (last final-output))
     (fmt-output final-output)
     (shutdown-agents)))
