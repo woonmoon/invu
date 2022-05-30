@@ -58,17 +58,14 @@
 
 (defn id-to-players [num-total-players player-ratios]
   {:pre [(= 1.0M (->> player-ratios vals (map bigdec) (apply +)))]}
-  (let 
-    [player-type-population
+  (->> player-ratios
       (reduce-kv
         (fn [m player-type ratio]
           (assoc m player-type (math/round (* ratio num-total-players))))
-          {}
-          player-ratios)]
-  (->> player-type-population
+        {})
        (mapcat spawn-players)
        (map (fn [p] [(.id p) p]))
-       (into {}))))
+       (into {})))
 
 (defn init-state [num-steps id-to-players]
   (let [num-entries (inc num-steps)
