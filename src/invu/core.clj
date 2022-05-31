@@ -29,10 +29,8 @@
   ])
 
 (defonce initial-inactive-players {
-  :surviving-players 
-      { 0 nil }
-  :dead-players
-      { 0 nil }
+  :surviving-players {}
+  :dead-players {}
 })
 
 ;; The most over-engineered thing I've ever written.
@@ -210,7 +208,9 @@
           leading-tiles (map leading-tile [old-bridge new-bridge])
           leading-players (map get [old-bridge new-bridge] leading-tiles)
           next-step (inc (count common-knowledge))]
-      (if (or (apply < leading-tiles) (apply not= leading-players))
+      (if (or (and (apply < leading-tiles) 
+                  (> (second leading-tiles) (count common-knowledge))) 
+              (apply not= leading-players))
         (into (sorted-map) 
           (assoc 
             common-knowledge
@@ -283,7 +283,7 @@
               (contains? inactive-players :dead-players))]}
   (reduce-kv
       (fn [m category players]
-          (assoc-in m [category curr-tick] players))
+          (assoc-in m [category players] curr-tick))
   inactive-players
   {
     :surviving-players (vals survivors) 
@@ -313,33 +313,34 @@
         (assoc-in final-player-state [:dead-players :timeout] (seq eliminated))]))
 
 (defn tick [state id->player inactive-players tempered-tiles total-time]
-  (println state)
-  (let [active-id->location 
-          (active-id->location state)
-        active-players
-          (select-keys id->player (keys active-id->location))
-        moving-players 
-          (moving-players 
-            active-id->location 
-            id->player 
-            (:common-knowledge state) 
-            (:common-cooperation state)
-            (count tempered-tiles)
-            (:chance-of-death state))
-        new-state 
-          (update-state state moving-players tempered-tiles total-time)
-        new-id->player
-          (update-active-players active-players state new-state)
-        surviving-players
-          (select-keys id->player (:survivors new-state))
-        dead-players
-          (select-keys id->player (:dead-players new-state))
-        new-inactive-players
-          (update-inactive-players 
-            inactive-players
-            surviving-players 
-            dead-players 
-            (:tick new-state))]
+  (let 
+    [active-id->location 
+      (active-id->location state)
+    active-players
+      (select-keys id->player (keys active-id->location))
+    moving-players 
+      (moving-players 
+        active-id->location 
+        id->player 
+        (:common-knowledge state) 
+        (:common-cooperation state)
+        (count tempered-tiles)
+        (:chance-of-death state))
+    new-state 
+      (update-state state moving-players tempered-tiles total-time)
+    new-id->player
+      (update-active-players active-players state new-state)
+    surviving-players
+      (set/difference (:survivors state) (:survivors new-state)) 
+    dead-players
+      (set/difference (:dead-players state) (:dead-players new-state))
+    new-inactive-players
+      (update-inactive-players 
+        inactive-players
+        surviving-players 
+        dead-players 
+        (:tick new-state))]
+    (pp/pprint new-state)
     [new-state new-id->player new-inactive-players]))
 
 (defn simulate 
