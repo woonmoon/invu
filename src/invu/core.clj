@@ -109,7 +109,7 @@
   (let [final-step (last (keys bridge))
         survivor-step (inc final-step)
         tile-available? 
-          #(or (= %1 final-step) (nil? %2))
+          #(nil? %)
         willing? 
           #(contains? moving-players %)
         survives? 
@@ -125,12 +125,14 @@
         (fn [acc-bridge step player]
           (let [[last-step last-player] (last acc-bridge)]
             (cond
+                (= step final-step)
+                  (moves-forward-survives acc-bridge last-step player step)
                 (and  (willing? player) 
-                      (tile-available? step last-player) 
+                      (tile-available? last-player) 
                       (survives? step))
                   (moves-forward-survives acc-bridge last-step player step)
                 (and  (willing? player) 
-                      (tile-available? step last-player) 
+                      (tile-available? last-player) 
                       (not (survives? step)))
                   (moves-forward-dies acc-bridge last-step step)
                 :else
@@ -340,7 +342,6 @@
         surviving-players 
         dead-players 
         (:tick new-state))]
-    (pp/pprint new-state)
     [new-state new-id->player new-inactive-players]))
 
 (defn simulate 
