@@ -283,14 +283,17 @@
 (defn update-inactive-players [inactive-players survivors deceased curr-tick]
   {:pre [(and (contains? inactive-players :surviving-players) 
               (contains? inactive-players :dead-players))]}
+  (pp/pprint curr-tick)
+  (pp/pprint survivors)
+  (pp/pprint deceased)
   (reduce-kv
-      (fn [m category players]
-          (assoc-in m [category players] curr-tick))
-  inactive-players
-  {
-    :surviving-players (vals survivors) 
-    :dead-players (vals deceased)
-  }))
+    (fn [m category players]
+        (assoc-in m [category players] curr-tick))
+    inactive-players
+    {
+      :surviving-players (first survivors)
+      :dead-players (first deceased)
+    }))
 
   (defn eliminate-remaining [final-state final-player-state]
     ;; Move anyone on the platform and bridge to deceased players under :time-out
@@ -333,9 +336,9 @@
     new-id->player
       (update-active-players active-players state new-state)
     surviving-players
-      (set/difference (:survivors state) (:survivors new-state)) 
+      (set/difference (:survivors new-state) (:survivors state)) 
     dead-players
-      (set/difference (:dead-players state) (:dead-players new-state))
+      (set/difference (:dead-players new-state) (:dead-players state))
     new-inactive-players
       (update-inactive-players 
         inactive-players
@@ -397,6 +400,6 @@
             initial-inactive-players 
             tempered-tiles 
             num-ticks)]
-    ;; (println (last final-output))
+    ;; (pp/pprint (first final-output))
     (fmt-output final-output)
     (shutdown-agents)))
