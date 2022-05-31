@@ -10,9 +10,10 @@
   (:gen-class))
 
 (defn gen-tempered-tiles [num-steps]
-  (zipmap
-    (range 1 (inc num-steps))
-    (repeatedly num-steps #(rand-int 2))))
+  (into (sorted-map) 
+    (zipmap
+      (range 1 (inc num-steps))
+      (repeatedly num-steps #(rand-int 2)))))
 
 (defrecord State
   [
@@ -227,8 +228,12 @@
           (jump-off-platform (:platform state) bridge moving-players)
         phantom-step (last temp-bridge)
         new-bridge (into (sorted-map) (dissoc temp-bridge (key phantom-step))) 
-        new-dead-players 
-          (deceased-players (:bridge state) new-bridge (:dead-players state))
+        new-dead-players
+          ;; NOTE: It is certain that anyone who was on the last step in the old-bridge has survived.
+          (deceased-players 
+            (dissoc (:bridge state) (count tempered-tiles)) 
+            new-bridge 
+            (:dead-players state))
         new-survivors 
           (cond-> (:survivors state) 
             (val phantom-step) (conj (val phantom-step)))
@@ -280,16 +285,20 @@
       {}
       active-players)))
 
+(defn update-survivors [inactive-players survivors curr-tick]
+  (if-let [survivor (first survivors)]
+    (assoc-in inactive-players [:surviving-players survivor] curr-tick)
+    inactive-players))
+
+(defn update-deceased [inactive-players deceased curr-tick]
+  (if-let [dead (first deceased)]
+    (assoc-in inactive-players [:dead-players dead] curr-tick)
+    inactive-players))
+
 (defn update-inactive-players [inactive-players survivors deceased curr-tick]
-  (reduce-kv
-    (fn [m category players]
-        (when players
-          (assoc-in m [category players] curr-tick)))
-    inactive-players
-    {
-      :surviving-players (first survivors)
-      :dead-players (first deceased)
-    }))
+  (-> inactive-players
+      (update-survivors survivors curr-tick)
+      (update-deceased deceased curr-tick)))
 
 (defn eliminate-remaining [final-state final-player-state]
   ;; Move anyone on the platform and bridge to deceased players under :time-out
@@ -342,6 +351,8 @@
         surviving-players 
         dead-players 
         (:tick new-state))]
+    (pp/pprint new-state)
+    (newline)
     [new-state new-id->player new-inactive-players]))
 
 (defn simulate 
