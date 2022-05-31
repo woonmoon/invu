@@ -281,41 +281,38 @@
       active-players)))
 
 (defn update-inactive-players [inactive-players survivors deceased curr-tick]
-  {:pre [(and (contains? inactive-players :surviving-players) 
-              (contains? inactive-players :dead-players))]}
-  (pp/pprint curr-tick)
-  (pp/pprint survivors)
-  (pp/pprint deceased)
   (reduce-kv
     (fn [m category players]
-        (assoc-in m [category players] curr-tick))
+        (when players
+          (assoc-in m [category players] curr-tick)))
     inactive-players
     {
       :surviving-players (first survivors)
       :dead-players (first deceased)
     }))
 
-  (defn eliminate-remaining [final-state final-player-state]
-    ;; Move anyone on the platform and bridge to deceased players under :time-out
-    (let [eliminated (set/union (:platform final-state)
-                                (->> final-state
-                                    :bridge
-                                    vals
-                                    (remove nil?)
-                                    set))
-          all-dead (set/union eliminated (:dead-players final-state))]
-      [(->State 
-          #{} 
-          nil 
-          all-dead 
-          (:survivors final-state) 
-          (:common-knowledge final-state)
-          (:tick final-state)
-          (:moves-made final-state)
-          (:chance-of-death final-state)
-          (:jump-misfortune final-state)
-          (:common-cooperation final-state))
-        (assoc-in final-player-state [:dead-players :timeout] (seq eliminated))]))
+(defn eliminate-remaining [final-state final-player-state]
+  ;; Move anyone on the platform and bridge to deceased players under :time-out
+  (let [eliminated (set/union (:platform final-state)
+                              (->> final-state
+                                  :bridge
+                                  vals
+                                  (remove nil?)
+                                  set))
+        eliminated-set (zipmap eliminated (take (count eliminated) (repeat nil)))
+        all-dead (set/union eliminated (:dead-players final-state))]
+    [(->State 
+        #{} 
+        nil 
+        all-dead 
+        (:survivors final-state) 
+        (:common-knowledge final-state)
+        (:tick final-state)
+        (:moves-made final-state)
+        (:chance-of-death final-state)
+        (:jump-misfortune final-state)
+        (:common-cooperation final-state))
+      (update-in final-player-state [:dead-players] merge eliminated-set)]))
 
 (defn tick [state id->player inactive-players tempered-tiles total-time]
   (let 
@@ -368,12 +365,13 @@
     (assoc user-def-config :tempered-tiles tempered-tiles)))
 
 (defn fmt-output [[final-state final-player-state]]
-  (let [output {
+  (let [output 
+        (merge {
           :num-survivors (count (:survivors final-state))
-          :num-deceased "tbc"
+          :num-deceased (count (:dead-players final-state))
           :common-knowledge (:common-knowledge final-state)
-          :final-player-state final-player-state
-        }]
+        } 
+        final-player-state)]
     (spit "output.edn" (with-out-str (pp/pprint output)))))
 
 ;; Ask Professor if the moves-made metric has any meaning since 
