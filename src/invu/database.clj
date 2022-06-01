@@ -5,7 +5,17 @@
     (:gen-class))
 
 (defrecord GameStateRow
-    [])
+    [
+        num-players
+        num-steps
+        num-ticks
+        uncooperative-aggressive
+        uncooperative-unaggressive
+        cooperative-aggressive
+        cooperative-unaggressive
+        num-survivors
+        knowledge-mined
+    ])
 
 (defrecord PlayerStateRow 
     [
@@ -19,6 +29,18 @@
         status ; Dead or alive
         tick ; As of what tick.
     ])
+
+(defn create-game-state-row [config final-state]
+    (->GameStateRow
+        (:num-players config)
+        (:num-steps config)
+        (:num-ticks config)
+        (:uncooperative-aggressive config)
+        (:uncooperative-unaggressive config)
+        (:cooperative-aggressive config)
+        (:cooperative-unaggressive config)
+        (count (:survivors final-state))
+        (/ (count (:common-knowledge final-state)) (:num-steps config))))
 
 (defn create-player-row [init-player [final-player [status tick]]]
     (->PlayerStateRow
