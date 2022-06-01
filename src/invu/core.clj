@@ -1,12 +1,13 @@
 (ns invu.core
   (:require [clojure.set :as set]
             [clojure.data :as data]
-            [invu.util :as util]
-            [invu.player :as players]
             [clojure.pprint :as pp]
             [clojure.math :as math]
             [clojure.string :as str]
-            [clojure.edn :as edn])
+            [clojure.edn :as edn]
+            [invu.util :as util]
+            [invu.player :as players]
+            [invu.database :as db])
   (:gen-class))
 
 (defn gen-tempered-tiles [num-steps]
@@ -28,11 +29,6 @@
     jump-misfortune 
     common-cooperation
   ])
-
-(defonce initial-inactive-players {
-  :surviving-players {}
-  :dead-players {}
-})
 
 ;; The most over-engineered thing I've ever written.
 (defn gen-player-stats [player-type]
@@ -269,16 +265,16 @@
       new-common-cooperation)))
 
 (defn update-active-players [active-players old-state new-state]
-  (let [deltas 
+  (let [[delta-chance-of-death delta-jump-misfortune delta-common-cooperation] 
           (apply mapv - 
             (map 
               (juxt :common-cooperation (comp last :chance-of-death) :jump-misfortune) 
               [new-state old-state]))
         new-player #(players/->Random 
                       (:id %)
-                      (players/update-will-to-live % (first deltas))
-                      (players/update-aggression % (second deltas))
-                      (players/update-cooperation % (nth deltas 2)))]
+                      (players/update-will-to-live % delta-chance-of-death)
+                      (players/update-aggression % delta-jump-misfortune)
+                      (players/update-cooperation % delta-common-cooperation))]
     (reduce-kv
       (fn [m id player] 
         (assoc m id (new-player player))) 
@@ -287,12 +283,12 @@
 
 (defn update-survivors [inactive-players survivors curr-tick]
   (if-let [survivor (first survivors)]
-    (assoc-in inactive-players [:surviving-players survivor] curr-tick)
+    (assoc inactive-players (:id survivor) [survivor [:survived curr-tick]])
     inactive-players))
 
 (defn update-deceased [inactive-players deceased curr-tick]
   (if-let [dead (first deceased)]
-    (assoc-in inactive-players [:dead-players dead] curr-tick)
+    (assoc inactive-players (:id dead) [dead [:dead curr-tick]])
     inactive-players))
 
 (defn update-inactive-players [inactive-players survivors deceased curr-tick]
@@ -300,16 +296,22 @@
       (update-survivors survivors curr-tick)
       (update-deceased deceased curr-tick)))
 
-(defn eliminate-remaining [final-state final-player-state]
+(defn eliminate-remaining [final-state id->player final-player-state]
   ;; Move anyone on the platform and bridge to deceased players under :time-out
-  (let [eliminated (set/union (:platform final-state)
-                              (->> final-state
-                                  :bridge
-                                  vals
-                                  (remove nil?)
-                                  set))
-        eliminated-set (zipmap eliminated (take (count eliminated) (repeat nil)))
-        all-dead (set/union eliminated (:dead-players final-state))]
+  (let [eliminated-players (select-keys 
+                              id->player 
+                              (set/union (:platform final-state)
+                                        (->> final-state
+                                            :bridge
+                                            vals
+                                            (remove nil?)
+                                            set)))
+        eliminated-entries (reduce-kv
+                              (fn [m k v]
+                                (assoc m k [v [:dead nil]]))
+                              {}
+                              eliminated-players)
+        all-dead (set/union (keys eliminated-players) (:dead-players final-state))]
     [(->State 
         #{} 
         nil 
@@ -321,7 +323,7 @@
         (:chance-of-death final-state)
         (:jump-misfortune final-state)
         (:common-cooperation final-state))
-      (update-in final-player-state [:dead-players] merge eliminated-set)]))
+      (merge final-player-state eliminated-entries)]))
 
 (defn tick [state id->player inactive-players tempered-tiles total-time]
   (let 
@@ -342,17 +344,21 @@
     new-id->player
       (update-active-players active-players state new-state)
     surviving-players
-      (set/difference (:survivors new-state) (:survivors state)) 
+      (vals 
+        (select-keys 
+          id->player 
+          (set/difference (:survivors new-state) (:survivors state))))
     dead-players
-      (set/difference (:dead-players new-state) (:dead-players state))
+      (vals
+        (select-keys
+          id->player 
+          (set/difference (:dead-players new-state) (:dead-players state))))
     new-inactive-players
       (update-inactive-players 
         inactive-players
         surviving-players 
         dead-players 
         (:tick new-state))]
-    (pp/pprint new-state)
-    (newline)
     [new-state new-id->player new-inactive-players]))
 
 (defn simulate 
@@ -364,7 +370,7 @@
       (empty? id->player) 
         [state inactive-players]
       (= (:tick state) total-time) 
-        (eliminate-remaining state inactive-players)
+        (eliminate-remaining state id->player inactive-players)
       :else
         (let [[new-state new-id->player new-inactive-players] 
           (tick state id->player inactive-players tempered-tiles total-time)]
@@ -375,14 +381,22 @@
         tempered-tiles (gen-tempered-tiles (:num-steps user-def-config))]
     (assoc user-def-config :tempered-tiles tempered-tiles)))
 
-(defn fmt-output [[final-state final-player-state]]
-  (let [output 
-        (merge {
-          :num-survivors (count (:survivors final-state))
-          :num-deceased (count (:dead-players final-state))
-          :common-knowledge (:common-knowledge final-state)
-        } 
-        final-player-state)]
+(defn fmt-data [config-file initial-player-state final-player-state]
+  {:pre 
+    [(apply = (map (comp set keys) [initial-player-state final-player-state]))]}
+  (let [output {:config config-file
+                :initial-players initial-player-state
+                :final-players final-player-state}
+        player-output
+          (map
+            #(db/create-player-row 
+              (second %)
+              (get final-player-state (first %)))
+            initial-player-state)]
+    ;; (pp/pprint initial-player-state)
+    ;; (println "************************")
+    ;; (pp/pprint final-player-state)
+    (pp/pprint player-output)
     (spit "output.edn" (with-out-str (pp/pprint output)))))
 
 ;; Ask Professor if the moves-made metric has any meaning since 
@@ -406,9 +420,9 @@
           (simulate 
             initial-state 
             initial-players 
-            initial-inactive-players 
+            {}
             tempered-tiles 
             num-ticks)]
     ;; (pp/pprint (first final-output))
-    (fmt-output final-output)
+    (fmt-data config initial-players (second final-output))
     (shutdown-agents)))
