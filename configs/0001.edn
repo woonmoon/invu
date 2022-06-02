@@ -1,0 +1,7 @@
+{:num-ticks 10,
+ :num-steps 5,
+ :num-players 10,
+ :uncooperative-unaggressive 0,
+ :uncooperative-aggressive 0,
+ :cooperative-unaggressive 0,
+ :cooperative-aggressive 1}

@@ -265,19 +265,14 @@
       new-common-cooperation)))
 
 (defn update-active-players [active-players old-state new-state]
-  (let [[delta-chance-of-death delta-jump-misfortune delta-common-cooperation] 
+  (let [deltas 
           (apply mapv - 
             (map 
               (juxt :common-cooperation (comp last :chance-of-death) :jump-misfortune) 
-              [new-state old-state]))
-        new-player #(players/->Random 
-                      (:id %)
-                      (players/update-will-to-live % delta-chance-of-death)
-                      (players/update-aggression % delta-jump-misfortune)
-                      (players/update-cooperation % delta-common-cooperation))]
+              [new-state old-state]))]
     (reduce-kv
       (fn [m id player] 
-        (assoc m id (new-player player))) 
+        (assoc m id (players/update-player player (first deltas)(second deltas) (last deltas)))) 
       {}
       active-players)))
 
@@ -376,33 +371,39 @@
           (tick state id->player inactive-players tempered-tiles total-time)]
             (recur new-state new-id->player new-inactive-players)))))
 
-(defn parse-config [config-file]
-  (let [user-def-config (edn/read-string (slurp config-file))
+(defn parse-config [config-file-name]
+  (let [user-def-config (edn/read-string (slurp config-file-name))
         tempered-tiles (gen-tempered-tiles (:num-steps user-def-config))]
-    (assoc user-def-config :tempered-tiles tempered-tiles)))
+    (assoc user-def-config :id (gensym "cfg") :tempered-tiles tempered-tiles)))
 
-(defn fmt-data [config-file initial-player-state final-player-state]
+(defn update-config [config file-name]
+  (spit file-name (with-out-str (pp/pprint config))))
+
+(defn fmt-player-states [initial-player-state final-player-state]
   {:pre 
     [(apply = (map (comp set keys) [initial-player-state final-player-state]))]}
-  (let [output {:config config-file
-                :initial-players initial-player-state
-                :final-players final-player-state}
-        player-output
-          (map
-            #(db/create-player-row 
-              (second %)
-              (get final-player-state (first %)))
-            initial-player-state)]
-    ;; (pp/pprint initial-player-state)
-    ;; (println "************************")
-    ;; (pp/pprint final-player-state)
-    (pp/pprint player-output)
-    (spit "output.edn" (with-out-str (pp/pprint output)))))
+  (map
+    #(db/create-player-row (second %) (get final-player-state (first %)))
+    initial-player-state))
+
+(defn fmt-game-state [config final-game-state]
+  (db/create-game-state-row config final-game-state))
+
+(defn fmt-output 
+  [config final-game-state initial-player-state final-player-state]
+  ;; (spit "output.edn" (with-out-str (pp/pprint 
+    {
+      :game-state (fmt-game-state config final-game-state)
+      :player-state (fmt-player-states initial-player-state final-player-state)
+    }
+    ;; )))
+    )
 
 ;; Ask Professor if the moves-made metric has any meaning since 
 ;; once the pioneer goes everyone else just follows.
-(defn -main [& args]
-  (let [config (parse-config "config.edn")
+(defn -main [config-file experiment-no & args]
+  (let [config (parse-config config-file)
+        experiment-id (str (first (str/split config-file #".")) ":" experiment-no)
         num-players (:num-players config)
         num-steps (:num-steps config)
         num-ticks (:num-ticks config)
@@ -422,7 +423,14 @@
             initial-players 
             {}
             tempered-tiles 
-            num-ticks)]
+            num-ticks)
+        output (fmt-output 
+                  config 
+                  (first final-output) 
+                  initial-players
+                  (second final-output))]
     ;; (pp/pprint (first final-output))
-    (fmt-data config initial-players (second final-output))
+    (update-config config config-file)
+    (db/log-game output experiment-id)
+    (db/log-players output experiment-id)
     (shutdown-agents)))

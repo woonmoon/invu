@@ -35,7 +35,9 @@
     (move [player common-knowledge])
     (update-cooperation [player delta-common-cooperation])
     (update-will-to-live [player delta-chance-of-death])
-    (update-aggression [player delta-jump-misfortune]))
+    (update-aggression [player delta-jump-misfortune])
+    (update-player 
+        [player delta-chance-of-death delta-jump-misfortune delta-common-cooperation]))
 
 ;; Common Cooperation [0, 1]
 ;; Mean average of how many moves have been made so far.
@@ -124,4 +126,12 @@
             (:aggression player)
             delta-jump-misfortune
             0.2
-            0)))
+            0))
+
+    (update-player 
+        [player delta-chance-of-death delta-jump-misfortune delta-common-cooperation]
+        (->Random 
+            (:id player) 
+            (update-will-to-live player delta-chance-of-death)
+            (update-aggression player delta-jump-misfortune)
+            (update-cooperation player delta-common-cooperation))))

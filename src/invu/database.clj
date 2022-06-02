@@ -1,6 +1,8 @@
 (ns invu.database
     (:require [clojure.set :as set]
               [clojure.data :as data]
+              [clojure.java.io :as io]
+              [clojure.string :as string]
               [clojure.edn :as edn])
     (:gen-class))
 
@@ -40,7 +42,7 @@
         (:cooperative-aggressive config)
         (:cooperative-unaggressive config)
         (count (:survivors final-state))
-        (/ (count (:common-knowledge final-state)) (:num-steps config))))
+        (double (/ (count (:common-knowledge final-state)) (:num-steps config)))))
 
 (defn create-player-row [init-player [final-player [status tick]]]
     (->PlayerStateRow
@@ -53,3 +55,33 @@
         (:aggression final-player)
         status
         tick))
+    
+(defonce endl "\n")
+
+(defn fmtln [& args]
+    (str (string/join " " args) endl))
+
+(defn log-game [output experiment-id]
+    (with-open [wrtr (io/writer (str "outputs/log-state-" experiment-id) :append true)]
+        (.write 
+            wrtr 
+            (fmtln 
+                experiment-id
+                (:num-survivors (:game-state output)) 
+                (:knowledge-mined (:game-state output))))))
+
+(defn log-players [output experiment-id]
+    (with-open [wrtr (io/writer (str "outputs/log-players-" experiment-id) :append true)]
+        (doseq [p (:player-state output)]
+            (.write wrtr 
+                (fmtln
+                    experiment-id
+                    (:id p) 
+                    (:init-will-to-live p)
+                    (:final-will-to-live p) 
+                    (:init-cooperation p)
+                    (:final-cooperation p)
+                    (:init-aggression p)
+                    (:final-aggression p)
+                    (:status p)
+                    (:tick p))))))
