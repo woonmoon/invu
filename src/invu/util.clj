@@ -1,5 +1,6 @@
 (ns invu.util
-    (:require [clojure.set :as set]))
+    (:require [clojure.set :as set]
+              [clojure.string :as str]))
 
 (defn get-active-players [state]
     (concat (keep identity (vals (:bridge state))) (:platform state)))
@@ -10,6 +11,14 @@
 (defn split-map-by-keys [m keys]
     "Returns tuple where first is the map with keys and the second is without."
     [(select-keys m keys) (apply dissoc m keys)])
+
+(defn get-file-name [full-file-str]
+    "Removes config directory and edn file extension"
+    (-> full-file-str
+        (str/split #"\.edn$")
+        first
+        (str/split #"configs\/")
+        last))
 
 (defmacro fuzzy-label [thresholds x]
     "Returns correct fuzzy label given thresholds and score x."

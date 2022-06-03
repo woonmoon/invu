@@ -403,7 +403,7 @@
 ;; once the pioneer goes everyone else just follows.
 (defn -main [config-file experiment-no & args]
   (let [config (parse-config config-file)
-        experiment-id (str (first (str/split config-file #".")) ":" experiment-no)
+        experiment-id (str (util/get-file-name config-file) ":" experiment-no)
         num-players (:num-players config)
         num-steps (:num-steps config)
         num-ticks (:num-ticks config)
