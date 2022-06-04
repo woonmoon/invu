@@ -17,7 +17,8 @@ def main():
         "1000": "Uncooperative Unaggressive"
     }
     x = np.arange(len(num_survivor_labels))
-    width = 0.5
+    print(x)
+    width = 0.15
     for log_file in os.listdir("outputs/state"):
         with open(f"outputs/state/{log_file}") as f:
             config = log_file.replace("log-state-", "")
@@ -25,10 +26,10 @@ def main():
             # config_to_knowledge_mined[cfg_label[config]] = [ line for line in f.readlines()]
     
     fig, ax = plt.subplots()
-    rects1 = ax.bar(x-width/4, config_to_num_survivors["Cooperative Aggressive"], width, label="Cooperative Aggressive")
-    rects2 = ax.bar(x+width/4, config_to_num_survivors["Cooperative Unaggressive"], width, label="Cooperative Unaggressive")
-    rects3 = ax.bar(x+width/4, config_to_num_survivors["Uncooperative Aggressive"], width, label="Uncooperative Aggressive")
-    rects4 = ax.bar(x+width/4, config_to_num_survivors["Uncooperative Unaggressive"], width, label="Uncooperative Unaggressive")
+    rects1 = ax.bar(x-(1.5*width), config_to_num_survivors["Cooperative Aggressive"], width, label="Cooperative Aggressive")
+    rects2 = ax.bar(x-(0.5*width), config_to_num_survivors["Cooperative Unaggressive"], width, label="Cooperative Unaggressive")
+    rects3 = ax.bar(x+(0.5*width), config_to_num_survivors["Uncooperative Aggressive"], width, label="Uncooperative Aggressive")
+    rects4 = ax.bar(x+(1.5*width), config_to_num_survivors["Uncooperative Unaggressive"], width, label="Uncooperative Unaggressive")
 
     ax.set_ylabel("Frequency of Number of Survivors")
     ax.set_xticks(x, num_survivor_labels)
@@ -41,7 +42,6 @@ def main():
 
     fig.tight_layout()
     plt.show()
-    print(config_to_num_survivors)
     # fig, ax = plt.subplots()
 
 if __name__ == "__main__":
