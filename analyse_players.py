@@ -6,9 +6,13 @@ from enum import Enum
 
 class PlayerType(Enum):
     # 0001
-    Cooperative Aggressive = 1
+    CooperativeAggressive = 1
     # 0010
-    Cooperative Unaggressive = 2
+    CooperativeUnaggressive = 2
+    # 0100
+    UncooperativeAggressive = 3
+    # 1000
+    UncooperativeUnaggressive = 4
 
 def main():
     def is_alive(status):
@@ -18,7 +22,15 @@ def main():
         return list(map(float, row[:-2])) + [is_alive(row[-2]), int(row[-1])]
 
     def classify_player(cooperation, aggression):
-        if cooperation > 0.5
+        if cooperation >= 0.5 and aggression >= 0.5:
+            return PlayerType.CooperativeAggressive
+        elif cooperation >= 0.5 and aggression < 0.5:
+            return PlayerType.CooperativeUnaggressive
+        elif cooperation < 0.5 and aggression >= 0.5:
+            return PlayerType.UncooperativeAggressive
+        else:
+            return PlayerType.UncooperativeUnaggressive
+
     with open(f"outputs/players/log-player-all-even") as f:
         experiments = [line.split()[2:] for line in f.readlines()]
         for experiment in experiments:
@@ -27,8 +39,11 @@ def main():
         correct_experiments = map(cast_to_correct_type, experiments)
         column_labels = ["init_wtl", "final_wtl", "init_cooperation", "final_cooperation", "init_aggression", "final_aggression", "is_alive", "tick"]
         df = pd.DataFrame(correct_experiments, columns=column_labels)
-
-        print(df.head().to_string())
+        df["init_class"] = df.apply(lambda x: classify_player(x.init_cooperation, x.init_aggression), axis=1).astype("category")
+        df["final_class"] = df.apply(lambda x: classify_player(x.final_cooperation, x.final_aggression), axis=1).astype("category")
+        survivors_per_init_class = df.groupby(["init_class", "is_alive"]).count()
+        player_class_change = df.groupby(["init_class", "final_class"]).count()
+        breakpoint()
 
 if __name__ == "__main__":
     main()
