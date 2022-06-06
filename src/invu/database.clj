@@ -61,8 +61,8 @@
 (defn fmtln [& args]
     (str (string/join " " args) endl))
 
-(defn log-game [output experiment-id]
-    (with-open [wrtr (io/writer (str "outputs/log-state-" experiment-id) :append true)]
+(defn log-game [output config-name experiment-id]
+    (with-open [wrtr (io/writer (str "outputs/log-state-" config-name) :append true)]
         (.write 
             wrtr 
             (fmtln 
@@ -70,8 +70,8 @@
                 (:num-survivors (:game-state output)) 
                 (:knowledge-mined (:game-state output))))))
 
-(defn log-players [output experiment-id]
-    (with-open [wrtr (io/writer (str "outputs/log-players-" experiment-id) :append true)]
+(defn log-players [output config-name experiment-id]
+    (with-open [wrtr (io/writer (str "outputs/log-players-" config-name) :append true)]
         (doseq [p (:player-state output)]
             (.write wrtr 
                 (fmtln

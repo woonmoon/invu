@@ -431,6 +431,6 @@
                   (second final-output))]
     ;; (pp/pprint (first final-output))
     (update-config config config-file)
-    (db/log-game output experiment-id)
-    (db/log-players output experiment-id)
+    (db/log-game output (util/get-file-name config-file) experiment-id)
+    (db/log-players output (util/get-file-name config-file) experiment-id)
     (shutdown-agents)))

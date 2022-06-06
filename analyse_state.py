@@ -7,7 +7,6 @@ from matplotlib import pyplot as plt
 
 def num_survivors():
     num_survivor_labels = [0, 1, 2, 3, 4, 5]
-    knowledge_mined_labels = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
     config_to_num_survivors = {}
     cfg_label = { 
         "0001": "Cooperative Aggressive",
@@ -44,7 +43,7 @@ def num_survivors():
     fig.tight_layout()
     fig.savefig("homo-agents-num-survivors.jpg")
 
-def main():
+def knowledge_mined():
     config_to_knowledge_mined = {}
     cfg_label = { 
         "0001": "Cooperative Aggressive",
@@ -86,7 +85,9 @@ def main():
     fig.suptitle("Frequency of Knowledge-Mined With Homogenous Agent Populations", fontsize=10)
     fig.tight_layout()
     fig.savefig("homo-agents-knowledge-mined.jpg")
-    
+
+def main():
+    num_survivors()
 
 if __name__ == "__main__":
     main()
