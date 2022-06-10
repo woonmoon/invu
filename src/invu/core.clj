@@ -401,6 +401,7 @@
 
 ;; Ask Professor if the moves-made metric has any meaning since 
 ;; once the pioneer goes everyone else just follows.
+
 (defn -main [config-file experiment-no & args]
   (let [config (parse-config config-file)
         experiment-id (str (util/get-file-name config-file) ":" experiment-no)
@@ -430,7 +431,22 @@
                   initial-players
                   (second final-output))]
     ;; (pp/pprint (first final-output))
-    (update-config config config-file)
-    (db/log-game output (util/get-file-name config-file) experiment-id)
-    (db/log-players output (util/get-file-name config-file) experiment-id)
+    ;; (update-config config config-file)
+    ;; (db/log-game output (util/get-file-name config-file) experiment-id)
+    ;; (db/log-players output (util/get-file-name config-file) experiment-id)
+    (db/log-mega output (util/get-file-name config-file))
     (shutdown-agents)))
+
+;; (defn -main [& args]
+;;  (spit (str "configs/mega/all-survive/all-survive" (first args) ".edn")
+;;   (with-out-str 
+;;     (pp/pprint 
+;;       {
+;;         :num-players 50
+;;         :num-ticks 45
+;;         :num-steps 20
+;;         :cooperative-aggressive (read-string (nth args 1))
+;;         :cooperative-unaggressive (read-string (nth args 2))
+;;         :uncooperative-aggressive (read-string (nth args 3))
+;;         :uncooperative-unaggressive (read-string (nth args 4))
+;;       }))))

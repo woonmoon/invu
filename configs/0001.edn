@@ -1,9 +1,0 @@
-{:uncooperative-unaggressive 0,
- :num-players 10,
- :cooperative-unaggressive 0,
- :uncooperative-aggressive 0,
- :id cfg799,
- :num-ticks 10,
- :num-steps 5,
- :cooperative-aggressive 1,
- :tempered-tiles {1 1, 2 0, 3 0, 4 0, 5 1}}

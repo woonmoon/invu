@@ -70,6 +70,12 @@
                 (:num-survivors (:game-state output)) 
                 (:knowledge-mined (:game-state output))))))
 
+(defn log-mega [output config-name]
+    (with-open [wrtr (io/writer "outputs/tryagain" :append true)]
+        (.write
+            wrtr
+            (fmtln config-name (:num-survivors (:game-state output))))))
+
 (defn log-players [output config-name experiment-id]
     (with-open [wrtr (io/writer (str "outputs/log-players-" config-name) :append true)]
         (doseq [p (:player-state output)]
