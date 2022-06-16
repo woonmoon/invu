@@ -4,5 +4,4 @@ RUN mkdir /app
 WORKDIR /app
 ADD . /app/
 COPY . /app/
-# ADD . /app/
-CMD ["lein", "run"]
+CMD ["lein", "run", "configs/all-survive/all-survive0.edn", "0"]

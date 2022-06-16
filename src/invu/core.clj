@@ -430,12 +430,12 @@
                   (first final-output) 
                   initial-players
                   (second final-output))]
-    ;; (pp/pprint (first final-output))
     ;; (update-config config config-file)
-    ;; (db/log-game output (util/get-file-name config-file) experiment-id)
-    ;; (db/log-players output (util/get-file-name config-file) experiment-id)
-    (db/log-mega output (util/get-file-name config-file))
-    (shutdown-agents)))
+    (db/log-game output (util/get-file-name config-file) experiment-id)
+    (db/log-players output (util/get-file-name config-file) experiment-id)
+    ;; (db/log-mega output (util/get-file-name config-file))
+    (shutdown-agents))
+    )
 
 ;; (defn -main [& args]
 ;;  (spit (str "configs/mega/all-survive/all-survive" (first args) ".edn")

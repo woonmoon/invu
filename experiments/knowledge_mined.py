@@ -3,206 +3,31 @@
 import os, sys
 import numpy as np
 import matplotlib.pyplot as plt
+import itertools
 import pandas as pd
+import re
 
-
-def knowledge_mined():
-    def make_label_rows(filename, label):
-        with open(filename) as f: 
-            df = pd.DataFrame(
-                [float(line.split()[-1]) for line in f.readlines()],
-                columns=["knowledge_mined"]
-            )
-            df["label"] = label
-            return df
-
-    df = pd.concat(
-        [
-            make_label_rows(
-                "outputs/state/log-state-all-die-ca", 
-                "Cooperative Aggressive"
-            ),
-            make_label_rows(
-                "outputs/state/log-state-all-die-cua",
-                "Cooperative Unaggressive"
-            ),
-            make_label_rows(
-                "outputs/state/log-state-all-die-uca", 
-                "Uncooperative Aggressive"
-            ),
-            make_label_rows(
-                "outputs/state/log-state-all-die-ucua", 
-                "Uncooperative Unaggressive"
-            )
-        ]
-    )
-    df["label"].astype("category")
-    foo = df.groupby("label").agg(["mean", "median", "std", pd.Series.mode]).reset_index()
-    breakpoint()
-
-
-def num_survivors():
-    def make_label_rows(filename, label):
-        with open(filename) as f: 
-            df = pd.DataFrame(
-                [float(line.split()[1]) for line in f.readlines()],
-                columns=["num_survivors"]
-            )
-            df["label"] = label
-            return df
-
-    df = pd.concat(
-        [
-            make_label_rows(
-                "outputs/state/log-state-all-survive-ca", 
-                "Cooperative Aggressive"
-            ),
-            make_label_rows(
-                "outputs/state/log-state-all-survive-cua",
-                "Cooperative Unaggressive"
-            ),
-            make_label_rows(
-                "outputs/state/log-state-all-survive-uca", 
-                "Uncooperative Aggressive"
-            ),
-            make_label_rows(
-                "outputs/state/log-state-all-survive-ucua", 
-                "Uncooperative Unaggressive"
-            )
-        ]
-    )
-    foo = df.groupby("label").agg(["mean", "median", "std", pd.Series.mode]).reset_index()
-    avg_num_survivors = df.groupby("label").mean()
-    max_num_survivors = df.groupby("label").max()
-    mode_num_survivors = df.groupby("label").agg(pd.Series.mode)
-    breakpoint()
-
-def players():
-    # for player_file in os.listdir(""):
-    with open("outputs/players/log-players-half-survive-cua") as f:
-        df = pd.DataFrame(
-            [line.split() for line in f.readlines()],
-            columns= [
-                "experiment",
-                "id",
-                "init_wtl",
-                "final_wtl",
-                "init_cooperation", 
-                "final_cooperation", 
-                "init_aggression", 
-                "final_aggression", 
-                "is_alive", 
-                "tick"
-            ]
-        )
-        df["unique_id"] = df["experiment"].astype(str) + df["id"].astype(str)
-        df.drop(["experiment", "id"], axis=1, inplace=True)
-        df.tick.fillna(-1, inplace=True)
-        df = df.astype(
-            {
-                "init_wtl": "float", 
-                "final_wtl": "float", 
-                "init_cooperation": "float",
-                "final_cooperation": "float", 
-                "init_aggression": "float", 
-                "final_aggression": "float",
-                "is_alive": "category",
-                "tick": "int"
-            }
-        )
-        df["init_coop_class"] = pd.cut(
-            df.init_cooperation, 
-            bins=[0, 0.5, 1.0], 
-            labels=["Uncooperative", "Cooperative"]
-        )
-        df["init_aggr_class"] = pd.cut(
-            df.init_aggression,
-            bins=[0, 0.5, 1.0],
-            labels=["Unaggressive", "Aggressive"]
-        )
-        df["init_class"] = df["init_coop_class"].astype(str) + df["init_aggr_class"].astype(str)
-        df.drop(["init_coop_class", "init_aggr_class"], axis=1, inplace=True)
-        df["final_coop_class"] = pd.cut(
-            df.final_cooperation, 
-            bins=[0, 0.5, 1.0], 
-            labels=["Uncooperative", "Cooperative"]
-        )
-        df["final_aggr_class"] = pd.cut(
-            df.final_aggression,
-            bins=[0, 0.5, 1.0],
-            labels=["Unaggressive", "Aggressive"]
-        )
-        df["final_class"] = df["final_coop_class"].astype(str) + df["final_aggr_class"].astype(str)
-        df.drop(["final_coop_class", "final_aggr_class"], axis=1, inplace=True)
-        foo = df.groupby(["init_class", "is_alive"]).count()
-        bins = np.arange(0, 1.0, 0.05)
-        survivors_init_wtl = pd.cut(df[df["is_alive"] == ":survived"].init_wtl, bins=bins)
-        survivors_init_coop = pd.cut(df[df["is_alive"] == ":survived"].init_cooperation, bins=bins)
-        survivors_init_aggr = pd.cut(df[df["is_alive"] == ":survived"].init_aggression, bins=bins)
-        breakpoint()
-
-def foo():
-    ratios_ = [  
-                (i,j,k,l) 
-                for i in range(10) 
-                for j in range(10) 
-                for k in range(10) 
-                for l in range(10) if i + j + k + l == 10
-            ]
-    ratios = map(lambda x: map(lambda y: float(y/10), x), ratios_)
-    for i, ratio in enumerate(ratios):
-        r = list(ratio)
-        os.system(f"lein run {i} {r[0]} {r[1]} {r[2]} {r[3]}")
-
-def main():
+def config_df():
     filterchars = "{}:,"
-    path = "configs/mega/all-survive/all-survive"
-    data = []
-    with open("outputs/mega/all_live/all_live") as f: 
-        rows = [line.split() for line in f.readlines()]
-        rows = map(lambda r: [r[0].replace("mega/all-survive/all-survive", ""), int(r[1])], rows)
-        df_1 = pd.DataFrame(
-            rows,
-            columns=["label", "survivors"]
-        )
-        df_1.survivors.astype(int)
-    
-    all_live_df = df_1.groupby("label").agg(["mean", "std"]).reset_index()
-    all_live_df.columns = ["label", "all_live_mean", "all_live_std"]
-
-    with open("outputs/mega/half_die/half_die") as f: 
-        rows = [line.split() for line in f.readlines()]
-        rows = map(lambda r: [r[0].replace("mega/all-survive/all-survive", ""), int(r[1])], rows)
-        df_2 = pd.DataFrame(
-            rows,
-            columns=["label", "survivors"]
-        )
-        df_2.survivors.astype(int)
-    
-    half_die_df = df_2.groupby("label").agg(["mean", "std"]).reset_index()
-    half_die_df.columns = ["label", "half_die_mean", "half_die_std"]
-    breakpoint()
-    filterchars = "{}:,"
-    path = "configs/mega/all-survive/all-survive"
     data = []
     for i in range(0, 282):
-        with open(path+str(i)+".edn") as f: 
+        with open("configs/all-survive/all-survive"+str(i)+".edn") as f: 
             str_config = "".join(c for c in f.read() if c not in filterchars)
             config = dict(list(map(lambda s: s.lstrip().split(), str_config.split("\n")))[:-1])
             data.append(
                 [
                     i, 
-                    config["cooperative-aggressive"], 
-                    config["cooperative-unaggressive"], 
-                    config["uncooperative-aggressive"],
-                    config["uncooperative-unaggressive"]
+                    float(config["cooperative-aggressive"]), 
+                    float(config["cooperative-unaggressive"]), 
+                    float(config["uncooperative-aggressive"]),
+                    float(config["uncooperative-unaggressive"])
                 ]
             )
 
-    df = pd.DataFrame(
+    return pd.DataFrame(
         data, 
         columns=[
-            "label", 
+            "config_no", 
             "cooperative-aggressive",
             "cooperative-unaggressive",
             "uncooperative-aggressive",
@@ -210,8 +35,61 @@ def main():
         ]
     )
 
-    results = pd.merge(all_live_df, half_die_df).astype({"label": "int"})
-    df = pd.merge(df, results)
+def gen_state_csvs():
+    config_no_to_player_ratios = config_df()
+
+    def process_output(output_file_path, file_prefix):
+        def process_row(row):
+            config, trial_no = re.split("[-:]", row[0].replace(file_prefix, ""))
+            return [int(config), int(trial_no), int(row[1]), float(row[2])]
+        
+        with open(output_file_path) as f:
+            rows = map(process_row, [line.split() for line in f.readlines()])
+            df = pd.DataFrame(
+                rows,
+                columns=["config_no", "trial_no", "num_survivors", "knowledge_mined"]
+            )
+            df = df.groupby("config_no")[["num_survivors", "knowledge_mined"]].agg(["mean", "std"])
+            df = df.round(
+                {
+                    ("num_survivors", "mean"): 3, 
+                    ("num_survivors", "std"): 3, 
+                    ("knowledge_mined", "mean"): 3, 
+                    ("knowledge_mined", "std"): 3
+                }
+            )
+            df.columns = df.columns.to_flat_index()
+            return config_no_to_player_ratios.join(df).sort_values(by=[("num_survivors", "mean")], ascending=False)
+
+    all_live_df = process_output("outputs/all_survive/log_state", "all-survive/all-survive")
+    half_die_df = process_output("outputs/half_die/log_state", "half-die/half-die")
+
+    all_live_df.head(29).to_csv("outputs/all_survive/all_live.csv", index=False)
+    half_die_df.head(29).to_csv("outputs/half_die/half_die.csv", index=False)
+    return all_live_df, half_die_df
+
+
+def correlation_csvs():
+    all_live_df, half_die_df = gen_state_csvs()
+    state_statistics = [
+        ("num_survivors", "mean"), 
+        ("num_survivors", "std"), 
+        ("knowledge_mined", "mean"), 
+        ("knowledge_mined", "std")
+    ]
+    all_live_corr_df = all_live_df.corr(method="pearson")[state_statistics].drop(state_statistics).round(3)
+    all_live_corr_df.columns = all_live_corr_df.columns.to_flat_index()
+    half_die_corr_df = half_die_df.corr(method="pearson")[state_statistics].drop(state_statistics).round(3)
+    half_die_corr_df.columns = half_die_corr_df.columns.to_flat_index()
+
+    all_live_corr_df.to_csv("outputs/all_survive/corr.csv")
+    half_die_corr_df.to_csv("outputs/half_die/corr.csv")
+    return all_live_corr_df, half_die_corr_df
+
+
+def main():
+    correlation_csvs()
+    breakpoint()
     df_ca = df.groupby(["cooperative-aggressive"])[["all_live_mean", "half_die_mean"]].mean().reset_index()
     df_ca.columns = ["ratio", "all_live_mean_ca", "half_live_mean_ca"]
     df_cua = df.groupby(["cooperative-unaggressive"])[["all_live_mean", "half_die_mean"]].mean().reset_index()
@@ -242,8 +120,6 @@ def main():
     plt.figtext(0.4, 0.02, "Number of Players: 50, Number of Steps: 20, Number of Ticks: 45", ha="right", fontsize=5, bbox={"facecolor":"orange", "alpha":0.5, "pad":3})
     fig.suptitle("Number of Survivors With Varied Configurations", fontsize=10)
     fig.tight_layout()
-    # fig.savefig("configs_half_survive.jpg")
-    breakpoint()
 
 
 if __name__ == "__main__":

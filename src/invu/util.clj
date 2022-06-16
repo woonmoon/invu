@@ -56,6 +56,10 @@
             indicator# ~indicator
             rate# ~learning-rate
             threshold# ~threshold]
+        ; 0 < indicator
+        ; indicator > 0
+        ;   + pos reinforce
+        ;   - neg reinforce
         (if (< threshold# indicator#)
             (+ value# (* rate# (- 1 value#)))
             (- value# (* rate# value#)))))
